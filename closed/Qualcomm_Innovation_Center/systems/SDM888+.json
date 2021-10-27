@@ -1,0 +1,20 @@
+{
+        "System": "Xiaomi MIX4",
+        "Processor Name": "Qualcomm Snapdragon 888+",
+        
+        "CPU_Type_1": "1x Qualcomm Kryo 680 Prime Core: 3 Ghz",
+        "CPU_Type_2": "3x Qualcomm Kryo 680 Gold Cores: 2.42 Ghz",
+        "CPU_Type_3": "4x Qualcomm Kryo 680 Silver Cores: 1.80 Ghz",
+        
+        "Graphics": "Qualcomm Adreno 660",
+
+        "Accelerator_type_1": "Qualcomm Hexagon 780 Processor: Hexagon Vector eXtensions (HVX)",
+        "Accelerator_type_2": "Qualcomm Hexagon 780 Processor: Hexagon Tensor Processor (HTP)",
+        
+        "DRAM": "2xLPDDr5 8GB",
+        
+        "OS Version": "MIUI 12.5.7",
+        "TFlite Version": "2.6.0",
+        "TFLite delegate types": "none",
+        "vendor SDK": "Qualcomm Neural Processing SDK v1.54.2"
+}

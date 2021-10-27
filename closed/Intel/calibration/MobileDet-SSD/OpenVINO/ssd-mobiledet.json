@@ -1,0 +1,23 @@
+{
+    "model": {
+        "model_name": "ssd-mobiledet_int8",
+        "model": "IR/ssd-mobiledet.xml",
+        "weights": "IR/ssd-mobiledet.bin"
+    },
+    "engine": {
+		    "config": "ssd-mobiledet-tpu.yml"
+    },
+	  
+    "compression": {
+        "target_device": "GPU",
+        "algorithms": [
+            {
+                "name": "DefaultQuantization",
+                "params": {
+                    "stat_subset_size": 500,
+					          "preset": "performance"
+                }
+            }
+        ]
+    }
+}

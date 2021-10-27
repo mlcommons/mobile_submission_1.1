@@ -1,0 +1,30 @@
+models:
+  - name: mobilenetEdgeTPU
+    launchers:
+      - framework: dlsdk
+        tags:
+          - FP32
+        model:   IR/mobilenet-edge.xml
+        weights: IR/mobilenet-edge.bin
+        adapter: classification
+        
+    datasets:
+      - name: imagenet_1001_classes
+        annotation_conversion:
+          converter: imagenet
+          annotation_file: PATH/TO/cal_image_list_option_1.txt
+          has_background: True
+        data_source: PATH/TO/dataset-imagenet-ilsvrc2012-val
+        metrics:
+          - name: accuracy@top1
+            type: accuracy
+            top_k: 1
+          - name: accuracy@top5
+            type: accuracy
+            top_k: 5
+        preprocessing:
+          - type: bgr_to_rgb
+          - type: crop
+            central_fraction: 0.875
+          - type: resize
+            size: 224

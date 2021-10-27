@@ -1,0 +1,8 @@
+{
+    "input_data_types": "No change.",
+    "retraining": "We don’t retrain the model weight.",
+    "starting_weights_filename": "The original weight filename: https://github.com/mlcommons/mobile/blob/master/vision/mobilenet/models_and_code/checkpoints/float/edge_frozen_graph.pb",
+    "weight_data_types": "Signed 8-bit integer.",
+    "weight_transformations": "Convert original fp32 weight to int8 weight using symmetric quantization."
+}
+

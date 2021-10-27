@@ -1,0 +1,2873 @@
+diff --git a/.gitignore b/.gitignore
+index c86c00e..cd0802f 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -5,6 +5,7 @@
+ /bazel-*
+ /output
+ /output_logs
++/mobile_back_qti/snpe-*
+ *.so
+ * .apk
+ * .tflite
+@@ -12,3 +13,5 @@
+ * .zip
+ * .jar
+ * .tgz
++__pycache__/
++mobile_app_open.iml
+diff --git a/android/java/org/mlperf/inference/MLPerfTasks.java b/android/java/org/mlperf/inference/MLPerfTasks.java
+index d5e0ac0..313b54f 100644
+--- a/android/java/org/mlperf/inference/MLPerfTasks.java
++++ b/android/java/org/mlperf/inference/MLPerfTasks.java
+@@ -133,8 +133,7 @@ public final class MLPerfTasks {
+   }
+ 
+   public static String getResultsJsonPath() {
+-    return MLCtx.getInstance().getContext().getExternalFilesDir("mlperf").getAbsolutePath()
+-        + "/results.json";
++    return "/sdcard/mlperf_results/results.json";
+   }
+ 
+   // Update the results.json file.
+diff --git a/android/java/org/mlperf/inference/MiddleInterface.java b/android/java/org/mlperf/inference/MiddleInterface.java
+index 9990978..55e5cec 100644
+--- a/android/java/org/mlperf/inference/MiddleInterface.java
++++ b/android/java/org/mlperf/inference/MiddleInterface.java
+@@ -26,6 +26,7 @@ import android.util.Base64;
+ import android.util.Log;
+ import androidx.preference.PreferenceManager;
+ import java.io.IOException;
++import java.io.File;
+ import java.util.ArrayList;
+ import java.util.HashMap;
+ import org.mlperf.inference.exceptions.UnsupportedDeviceException;
+@@ -189,19 +190,16 @@ public final class MiddleInterface implements AutoCloseable, RunMLPerfWorker.Cal
+         batch = 1;
+       }
+       if (runMode.equals(AppConstants.SUBMISSION_MODE)) {
+-        String logDir =
+-            MLCtx.getInstance()
+-                .getContext()
+-                .getExternalFilesDir("log_performance/" + bm.getId())
+-                .getAbsolutePath();
+-
++        String logDir = "/sdcard/mlperf_results/log_performance/" + bm.getId();
++        File appDir = new File(logDir);
++        appDir.mkdirs();
++        Log.d(TAG,"log_performance file path: " + logDir);
+         startingList[counter] =
+             new StartData(bm.getId(), logDir, AppConstants.PERFORMANCE_LITE_MODE, batch);
+-        logDir =
+-            MLCtx.getInstance()
+-                .getContext()
+-                .getExternalFilesDir("log_accuracy/" + bm.getId())
+-                .getAbsolutePath();
++        logDir = "/sdcard/mlperf_results/log_accuracy/" + bm.getId();
++        appDir = new File(logDir);
++        appDir.mkdirs();
++        Log.d(TAG,"log_accuracy file path: " + logDir);
+ 
+         startingList[counter + benchmarksSize] =
+             new StartData(bm.getId(), logDir, AppConstants.ACCURACY_MODE, batch);
+@@ -216,11 +214,10 @@ public final class MiddleInterface implements AutoCloseable, RunMLPerfWorker.Cal
+         } else {
+           logDirBase = "log_undefined/";
+         }
+-        String logDir =
+-            MLCtx.getInstance()
+-                .getContext()
+-                .getExternalFilesDir(logDirBase + bm.getId())
+-                .getAbsolutePath();
++        String logDir = "/sdcard/mlperf_results/" + logDirBase + bm.getId();
++        File appDir = new File(logDir);
++        appDir.mkdirs();
++        Log.d(TAG,logDirBase + " file path: " + logDir);
+ 
+         startingList[counter] = new StartData(bm.getId(), logDir, runMode, batch);
+       }
+diff --git a/mobile_back_qti/DLC/Makefile b/mobile_back_qti/DLC/Makefile
+index e794a0c..6e2b8ec 100644
+--- a/mobile_back_qti/DLC/Makefile
++++ b/mobile_back_qti/DLC/Makefile
+@@ -17,9 +17,9 @@
+ 
+ include ../make/builddir.mk
+ 
+-all: ${BUILDDIR}/datasets.stamp sdm865-dlc sdm888-dlc
++all: ${BUILDDIR}/datasets.stamp hta-dlc htp-dlc
+ 
+-.PHONY: sdm865-dlc sdm888-dlc dependencies gen-sdm865-dlc-info gen-sdm888-dlc-info clean
++.PHONY: hta-dlc htp-dlc dependencies gen-hta-dlc-info gen-htp-dlc-info clean
+ 
+ include ../make/docker.mk
+ 
+@@ -27,19 +27,32 @@ DLCBUILDDIR=${BUILDDIR}/DLC
+ MODEL_BASE_PATH=${BUILDDIR}/mobile
+ MOBILENETEDGETPU_MODEL_PATH=${MODEL_BASE_PATH}/vision/mobilenet/models_and_code/checkpoints/float
+ DEEPLABV3QAT_MODEL_PATH=${MODEL_BASE_PATH}/vision/deeplab/models_and_code/checkpoints/quantize_aware_training
++MOBILEBERT_MODEL_PATH=${MODEL_BASE_PATH}/language/bert/models_and_code/checkpoints/quant/
+ 
+-sdm865-dlc: ${DLCBUILDDIR}/mobilenet_edgetpu_224_1.0_hta.stamp \
+-            ${DLCBUILDDIR}/ssd_mobiledet_qat_hta.stamp \
+-            ${DLCBUILDDIR}/deeplabv3_hta.stamp
++hta-dlc: ${DLCBUILDDIR}/mobilenet_edgetpu_224_1.0_hta.stamp \
++	${DLCBUILDDIR}/ssd_mobiledet_qat_hta.stamp \
++	${DLCBUILDDIR}/deeplabv3_hta.stamp
+ 
+-sdm888-dlc: ${DLCBUILDDIR}/mobilenet_edgetpu_224_1.0_htp.stamp \
+-            ${DLCBUILDDIR}/ssd_mobiledet_qat_htp.stamp \
+-            ${DLCBUILDDIR}/deeplabv3_htp.stamp \
+-	    ${DLCBUILDDIR}/mobilenet_edgetpu_224_1.0_htp_batched.stamp
++htp-dlc: ${DLCBUILDDIR}/mobilebert_htp.stamp \
++	${DLCBUILDDIR}/mobilenet_edgetpu_224_1.0_htp.stamp \
++	${DLCBUILDDIR}/ssd_mobiledet_qat_htp.stamp \
++	${DLCBUILDDIR}/deeplabv3_htp.stamp \
++	${DLCBUILDDIR}/mobilenet_edgetpu_224_1.0_htp_batched.stamp
++
++mobilenet_edgetpu: \
++	${DLCBUILDDIR}/mobilenet_edgetpu_224_1.0_htp.stamp \
++	${DLCBUILDDIR}/mobilenet_edgetpu_224_1.0_hta.stamp
+ 
+ mobiledet: \
+-	    ${DLCBUILDDIR}/ssd_mobiledet_qat_hta.stamp \
+-            ${DLCBUILDDIR}/ssd_mobiledet_qat_htp.stamp
++	${DLCBUILDDIR}/ssd_mobiledet_qat_hta.stamp \
++	${DLCBUILDDIR}/ssd_mobiledet_qat_htp.stamp
++
++deeplabv3: \
++	${DLCBUILDDIR}/deeplabv3_htp.stamp \
++	${DLCBUILDDIR}/deeplabv3_hta.stamp
++
++mobilebert: \
++	${DLCBUILDDIR}/mobilebert_htp.stamp
+ 
+ ${BUILDDIR}/datasets.stamp:
+ 	@(cd ../datasets && make)
+@@ -65,9 +78,9 @@ ${DLCBUILDDIR}/mobilenet_edgetpu_224_1.0_float.dlc: \
+ 		-u ${USERID}:${GROUPID} \
+ 		mlcommons/mlperf_mobile:1.0 \
+ 		/bin/bash -c '/snpe_sdk/bin/x86_64-linux-clang/snpe-tensorflow-to-dlc \
+- 		-i /models/frozen_graph_tf1x_transform.pb \
+-		-d input "1,224,224,3" --out_node "MobilenetEdgeTPU/Predictions/Softmax" \
+-		-o /output/mobilenet_edgetpu_224_1.0_float.dlc'
++			-i /models/frozen_graph_tf1x_transform.pb \
++			-d input "1,224,224,3" --out_node "MobilenetEdgeTPU/Predictions/Softmax" \
++			-o /output/mobilenet_edgetpu_224_1.0_float.dlc'
+ 
+ ${DLCBUILDDIR}/mobilenet_edgetpu_224_1.0_hta.stamp: \
+ 		${BUILDDIR}/mlperf_mobile_docker_1_0.stamp ${BUILDDIR}/datasets.stamp \
+@@ -82,10 +95,10 @@ ${DLCBUILDDIR}/mobilenet_edgetpu_224_1.0_hta.stamp: \
+ 		-u ${USERID}:${GROUPID} \
+ 		mlcommons/mlperf_mobile:1.0 \
+ 		/bin/bash -c "cd /imagenet-out && /snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-quantize \
+-		--input_dlc=/output/mobilenet_edgetpu_224_1.0_float.dlc \
+-		--input_list=/imagenet-out/imagenet_image_list.txt \
+-		--output_dlc=/output/mobilenet_edgetpu_224_1.0_hta.dlc \
+-  		--enable_hta"
++			--input_dlc=/output/mobilenet_edgetpu_224_1.0_float.dlc \
++			--input_list=/imagenet-out/imagenet_image_list.txt \
++			--output_dlc=/output/mobilenet_edgetpu_224_1.0_hta.dlc \
++			--enable_hta"
+ 	@echo "Mobilenetedge TPU model conversion completed"
+ 	@touch $@
+ 
+@@ -102,10 +115,11 @@ ${DLCBUILDDIR}/mobilenet_edgetpu_224_1.0_htp.stamp: \
+ 		-u ${USERID}:${GROUPID} \
+ 		mlcommons/mlperf_mobile:1.0 \
+ 		/bin/bash -c "cd /imagenet-out && /snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-quantize \
+-		--input_dlc=/output/mobilenet_edgetpu_224_1.0_float.dlc \
+-		--input_list=/imagenet-out/imagenet_image_list.txt \
+-		--output_dlc=/output/mobilenet_edgetpu_224_1.0_htp.dlc \
+-  		--enable_htp"
++			--input_dlc=/output/mobilenet_edgetpu_224_1.0_float.dlc \
++			--input_list=/imagenet-out/imagenet_image_list.txt \
++			--output_dlc=/output/mobilenet_edgetpu_224_1.0_htp.dlc \
++			--enable_htp \
++			--htp_socs sm8350,sm7325"
+ 	@echo "Mobilenetedge TPU model conversion completed"
+ 	@touch $@
+ 
+@@ -123,9 +137,9 @@ ${DLCBUILDDIR}/mobilenet_edgetpu_224_1.0_float_batched.dlc: \
+ 		-u ${USERID}:${GROUPID} \
+ 		mlcommons/mlperf_mobile:1.0 \
+ 		/bin/bash -c '/snpe_sdk/bin/x86_64-linux-clang/snpe-tensorflow-to-dlc \
+- 		-i /models/frozen_graph_tf1x_transform.pb \
+-		-d input "3,224,224,3" --out_node "MobilenetEdgeTPU/Predictions/Softmax" \
+-		-o /output/mobilenet_edgetpu_224_1.0_float_batched.dlc'
++			-i /models/frozen_graph_tf1x_transform.pb \
++			-d input "4,224,224,3" --out_node "MobilenetEdgeTPU/Predictions/Softmax" \
++			-o /output/mobilenet_edgetpu_224_1.0_float_batched.dlc'
+ 
+ ${DLCBUILDDIR}/mobilenet_edgetpu_224_1.0_htp_batched.stamp: \
+ 		${BUILDDIR}/mlperf_mobile_docker_1_0.stamp ${BUILDDIR}/datasets.stamp \
+@@ -140,15 +154,16 @@ ${DLCBUILDDIR}/mobilenet_edgetpu_224_1.0_htp_batched.stamp: \
+ 		-u ${USERID}:${GROUPID} \
+ 		mlcommons/mlperf_mobile:1.0 \
+ 		/bin/bash -c "cd /imagenet-out && /snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-quantize \
+-		--input_dlc=/output/mobilenet_edgetpu_224_1.0_float_batched.dlc \
+-		--input_list=/imagenet-out/imagenet_image_list.txt \
+-		--output_dlc=/output/mobilenet_edgetpu_224_1.0_htp_batched.dlc \
+-  		--enable_htp"
++			--input_dlc=/output/mobilenet_edgetpu_224_1.0_float_batched.dlc \
++			--input_list=/imagenet-out/imagenet_image_list.txt \
++			--output_dlc=/output/mobilenet_edgetpu_224_1.0_htp_batched.dlc \
++			--enable_htp \
++			--htp_socs sm8350,sm7325"
+ 	@echo "Mobilenetedge TPU model conversion completed"
+ 	@touch $@
+ 	
+ ${DLCBUILDDIR}/ssd_mobiledet_qat.dlc: \
+-                ${BUILDDIR}/mobile/.stamp
++		${BUILDDIR}/mobile/.stamp
+ 	@docker run \
+ 		-e PYTHONPATH=/snpe_sdk/lib/python \
+ 		-e LD_LIBRARY_PATH=/snpe_sdk/lib/x86_64-linux-clang \
+@@ -158,12 +173,12 @@ ${DLCBUILDDIR}/ssd_mobiledet_qat.dlc: \
+ 		-u ${USERID}:${GROUPID} \
+ 		mlcommons/mlperf_mobile:1.0 \
+ 		/bin/bash -c '/snpe_sdk/bin/x86_64-linux-clang/snpe-tensorflow-to-dlc \
+-		-i model/frozen_inference_graph.pb \
+-		-d Preprocessor/map/TensorArrayStack/TensorArrayGatherV3 "1,320,320,3" \
+-                --out_node "detection_classes" \
+-                --out_node "detection_boxes" \
+-                --out_node "detection_scores" \
+-		-o /dlc/ssd_mobiledet_qat.dlc'
++			-i model/frozen_inference_graph.pb \
++			-d Preprocessor/map/TensorArrayStack/TensorArrayGatherV3 "1,320,320,3" \
++			--out_node "detection_classes" \
++			--out_node "detection_boxes" \
++			--out_node "detection_scores" \
++			-o /dlc/ssd_mobiledet_qat.dlc'
+ 		
+ ${DLCBUILDDIR}/ssd_mobiledet_qat_hta.stamp: \
+ 		${BUILDDIR}/mlperf_mobile_docker_1_0.stamp ${BUILDDIR}/datasets.stamp \
+@@ -178,11 +193,11 @@ ${DLCBUILDDIR}/ssd_mobiledet_qat_hta.stamp: \
+ 		-v ${BUILDDIR}/coco/coco_out:/coco-out \
+ 		-u ${USERID}:${GROUPID} \
+ 		mlcommons/mlperf_mobile:1.0 \
+-		bash -c "cd /coco-out && /snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-quantize \
+-		--input_dlc=/output/ssd_mobiledet_qat.dlc \
+-		--input_list=/coco-out/coco_image_list.txt \
+-		--output_dlc=/output/ssd_mobiledet_qat_hta.dlc \
+-		--enable_hta --hta_partitions sm8250"
++		/bin/bash -c "cd /coco-out && /snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-quantize \
++			--input_dlc=/output/ssd_mobiledet_qat.dlc \
++			--input_list=/coco-out/coco_image_list.txt \
++			--output_dlc=/output/ssd_mobiledet_qat_hta.dlc \
++			--enable_hta --hta_partitions sm8250"
+ 	@echo "SSD MobileDET model conversion for HTA completed"
+ 	@touch $@
+ 
+@@ -200,11 +215,12 @@ ${DLCBUILDDIR}/ssd_mobiledet_qat_htp.stamp: \
+ 		-v ${BUILDDIR}/coco/coco_out:/coco-out \
+ 		-u ${USERID}:${GROUPID} \
+ 		mlcommons/mlperf_mobile:1.0 \
+-		bash -c "cd /coco-out && /snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-quantize \
+-		--input_dlc=/output/ssd_mobiledet_qat.dlc \
+-		--input_list=/coco-out/coco_image_list.txt \
+-		--output_dlc=/output/ssd_mobiledet_qat_htp.dlc \
+-		--enable_htp"
++		/bin/bash -c "cd /coco-out && /snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-quantize \
++			--input_dlc=/output/ssd_mobiledet_qat.dlc \
++			--input_list=/coco-out/coco_image_list.txt \
++			--output_dlc=/output/ssd_mobiledet_qat_htp.dlc \
++			--enable_htp \
++			--htp_socs sm8350,sm7325"
+ 	@echo "SSD MobileDET model conversion for HTP completed"
+ 	@touch $@
+ 
+@@ -224,11 +240,11 @@ ${DLCBUILDDIR}/deeplabv3_quantized.dlc: ${TOPDIR}/DLC/argmax-quant.json ${DEEPLA
+ 		-u ${USERID}:${GROUPID} \
+ 		mlcommons/mlperf_mobile:1.0 \
+ 		/bin/bash -c '/snpe_sdk/bin/x86_64-linux-clang/snpe-tensorflow-to-dlc \
+-		-i /deeplabv3/freeze.pb \
+-		-d ImageTensor "1,512,512,3" \
+-		--out_node ArgMax \
+-                --quantization_overrides /dlc/argmax-quant.json \
+-		-o /output/deeplabv3_quantized.dlc'
++			-i /deeplabv3/freeze.pb \
++			-d ImageTensor "1,512,512,3" \
++			--out_node ArgMax \
++			--quantization_overrides /dlc/argmax-quant.json \
++			-o /output/deeplabv3_quantized.dlc'
+ 	@echo "Generated DLC from Deeplabv3 QAT model"
+ 
+ 
+@@ -245,10 +261,10 @@ ${DLCBUILDDIR}/deeplabv3_hta.stamp: \
+ 		-u ${USERID}:${GROUPID} \
+ 		mlcommons/mlperf_mobile:1.0 \
+ 		/bin/bash -c 'cd /ade20k-out/ && /snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-quantize \
+-		--input_dlc=/output/deeplabv3_quantized.dlc \
+-		--input_list=/ade20k-out/ade20k_image_list.txt \
+-		--output_dlc=/output/deeplabv3_hta.dlc \
+-		--enable_hta'
++			--input_dlc=/output/deeplabv3_quantized.dlc \
++			--input_list=/ade20k-out/ade20k_image_list.txt \
++			--output_dlc=/output/deeplabv3_hta.dlc \
++			--enable_hta'
+ 	@echo "Deeplab v3 model conversion completed"
+ 	@# Can't use deeplabv3_hta.dlc as make target since this file is present on failure
+ 	@touch $@
+@@ -266,17 +282,89 @@ ${DLCBUILDDIR}/deeplabv3_htp.stamp: \
+ 		-u ${USERID}:${GROUPID} \
+ 		mlcommons/mlperf_mobile:1.0 \
+ 		/bin/bash -c 'cd /ade20k-out/ && /snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-quantize \
+-		--input_dlc=/output/deeplabv3_quantized.dlc \
+-		--input_list=/ade20k-out/ade20k_image_list.txt \
+-		--output_dlc=/output/deeplabv3_htp.dlc \
+-		--override_params --enable_htp'
++			--input_dlc=/output/deeplabv3_quantized.dlc \
++			--input_list=/ade20k-out/ade20k_image_list.txt \
++			--output_dlc=/output/deeplabv3_htp.dlc \
++			--override_params --enable_htp \
++			--htp_socs sm8350,sm7325'
+ 	@echo "Deeplab v3 model conversion completed"
+ 	@# Can't use deeplabv3_htp.dlc as make target since this file is present on failure
+ 	@touch $@
+ 
+-gen-sdm865-dlc-info: \
++${DLCBUILDDIR}/mobilebert_quant.pb: ${BUILDDIR}/mlperf_mobile_docker_1_0.stamp ${BUILDDIR}/datasets.stamp \
++		${BUILDDIR}/mobile/.stamp
++	@echo "MobileBERT quant model freeze ...."
++	@mkdir -p ${DLCBUILDDIR}
++	@docker run \
++		-e PYTHONPATH=/snpe_sdk/lib/python \
++		-e LD_LIBRARY_PATH=/snpe_sdk/lib/x86_64-linux-clang \
++		-v ${SNPE_SDK}:/snpe_sdk \
++		-v ${DLCBUILDDIR}:/output \
++		-v ${MOBILEBERT_MODEL_PATH}:/models \
++		-u ${USERID}:${GROUPID} \
++		mlcommons/mlperf_mobile:1.0 \
++		python3 /usr/local/lib/python3.6/dist-packages/tensorflow_core/python/tools/freeze_graph.py \
++			--input_graph=/models/saved_model.pb --input_checkpoint=/models/checkpoints/quant \
++			--output_graph=/output/mobilebert_quant.pb \
++			--output_node_names=end_logits,start_logits \
++			--input_binary= True \
++			--input_saved_model_dir=/models/ saved_model_tags="serve"
++
++${DLCBUILDDIR}/mobilebert_float.dlc:${DLCBUILDDIR}/mobilebert_quant.pb \
++									${BUILDDIR}/mlperf_mobile_docker_1_0.stamp \
++									${BUILDDIR}/datasets.stamp \
++									${BUILDDIR}/mobile/.stamp
++	@echo "MobileBERT tf to DLC conversion"
++	@mkdir -p ${DLCBUILDDIR}
++	@docker run \
++		-e PYTHONPATH=/snpe_sdk/lib/python \
++		-e LD_LIBRARY_PATH=/snpe_sdk/lib/x86_64-linux-clang \
++		-v ${SNPE_SDK}:/snpe_sdk \
++		-v ${DLCBUILDDIR}:/output \
++		-v ${TOPDIR}/DLC:/dlc \
++		-v ${MOBILEBERT_MODEL_PATH}:/models \
++		-u ${USERID}:${GROUPID} \
++		mlcommons/mlperf_mobile:1.0 \
++		/bin/bash -c '/snpe_sdk/bin/x86_64-linux-clang/snpe-tensorflow-to-dlc \
++			--input_network /output/mobilebert_quant.pb \
++			--input_dim bert/embeddings/ExpandDims 1,384,1 \
++			--input_dim input_mask 1,384 \
++			--input_dim segment_ids 1,384 \
++			--input_type bert/embeddings/ExpandDims opaque \
++			--input_type input_mask default \
++			--input_type segment_ids opaque \
++			--out_node transpose \
++			-o /output/mobilebert_float.dlc'
++	@echo "MobileBERT Float DLC conversion completed"
++
++
++${DLCBUILDDIR}/mobilebert_htp.stamp: ${DLCBUILDDIR}/mobilebert_float.dlc \
++		${BUILDDIR}/mlperf_mobile_docker_1_0.stamp \
++		${BUILDDIR}/datasets.stamp
++	@echo "MobileBERT float model quantization ..."
++	@mkdir -p ${DLCBUILDDIR}
++	@docker run \
++		-e PYTHONPATH=/snpe_sdk/lib/python \
++		-e LD_LIBRARY_PATH=/snpe_sdk/lib/x86_64-linux-clang \
++		-v ${SNPE_SDK}:/snpe_sdk \
++		-v ${BUILDDIR}/SQUAD/SQUAD_out:/squad-out \
++		-v ${DLCBUILDDIR}:/output \
++		-u ${USERID}:${GROUPID} \
++		mlcommons/mlperf_mobile:1.0 \
++		/bin/bash -c 'cd /squad-out/squad_raw/ && /snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-quantize \
++			--input_dlc=/output/mobilebert_float.dlc \
++			--input_list=/squad-out/squad_raw/input_list.txt \
++			--weights_bitwidth 8 \
++			--act_bitwidth 8 \
++			--enable_htp \
++			--htp_socs sm7325,sm8350 \
++			--use_encoding_optimizations \
++			--output_dlc=/output/mobilebert_quantized_htp.dlc'
++	@touch $@
++
++gen-hta-dlc-info: \
+ 		${BUILDDIR}/mlperf_mobile_docker_1_0.stamp ${BUILDDIR}/datasets.stamp \
+-		sdm865-dlc
++		hta-dlc
+ 	@docker run \
+ 		-e PYTHONPATH=/snpe_sdk/lib/python \
+ 		-e LD_LIBRARY_PATH=/snpe_sdk/lib/x86_64-linux-clang \
+@@ -285,13 +373,13 @@ gen-sdm865-dlc-info: \
+ 		-u ${USERID}:${GROUPID} \
+ 		mlcommons/mlperf_mobile:1.0 \
+ 		/bin/bash -c '\
+-		/snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-info -i /dlc/mobilenet_edgetpu_224_1.0_hta.dlc && \
+-		/snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-info -i /dlc/ssd_mobilenet_v2_qat_hta.dlc && \
+-		/snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-info -i /dlc/deeplabv3_hta.dlc'
++			/snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-info -i /dlc/mobilenet_edgetpu_224_1.0_hta.dlc && \
++			/snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-info -i /dlc/ssd_mobilenet_v2_qat_hta.dlc && \
++			/snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-info -i /dlc/deeplabv3_hta.dlc'
+ 
+-gen-sdm888-dlc-info: \
++gen-htp-dlc-info: \
+ 		${BUILDDIR}/mlperf_mobile_docker_1_0.stamp ${BUILDDIR}/datasets.stamp \
+-		sdm888-dlc
++		htp-dlc
+ 	@docker run \
+ 		-e PYTHONPATH=/snpe_sdk/lib/python \
+ 		-e LD_LIBRARY_PATH=/snpe_sdk/lib/x86_64-linux-clang \
+@@ -300,10 +388,10 @@ gen-sdm888-dlc-info: \
+ 		-u ${USERID}:${GROUPID} \
+ 		mlcommons/mlperf_mobile:1.0 \
+ 		/bin/bash -c '\
+-		/snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-info -i /dlc/mobilenet_edgetpu_224_1.0_htp.dlc && \
+-		/snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-info -i /dlc/ssd_mobiledet_qat_htp.dlc && \
+-		/snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-info -i /dlc/deeplabv3_htp.dlc && \
+-	        /snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-info -i /dlc/mobilenet_edgetpu_224_1.0_htp_batched.dlc'
++			/snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-info -i /dlc/mobilenet_edgetpu_224_1.0_htp.dlc && \
++			/snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-info -i /dlc/ssd_mobiledet_qat_htp.dlc && \
++			/snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-info -i /dlc/deeplabv3_htp.dlc && \
++			/snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-info -i /dlc/mobilenet_edgetpu_224_1.0_htp_batched.dlc'
+ 
+ test: ${BUILDDIR}/mlperf_snpe${OSVER}_docker_image.stamp
+ 	@docker run \
+@@ -314,7 +402,7 @@ test: ${BUILDDIR}/mlperf_snpe${OSVER}_docker_image.stamp
+ 		-u ${USERID}:${GROUPID} \
+ 		mlperf_snpe${OSVER}:latest \
+ 		/bin/bash -c '\
+-		/snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-info'
++			/snpe_sdk/bin/x86_64-linux-clang/snpe-dlc-info'
+ 
+ clean:
+ 	@rm -rf ${BUILDDIR}/DLC
+diff --git a/mobile_back_qti/README.md b/mobile_back_qti/README.md
+index b9b366c..9c3d85c 100644
+--- a/mobile_back_qti/README.md
++++ b/mobile_back_qti/README.md
+@@ -7,19 +7,19 @@ implementationn of [MLPerf Inference](https://github.com/mlperf/inference) tasks
+ 
+ This repository builds the libqtibackend.so backend and prepares the libraries and
+ SNPE DLC files for integration with the MLPerf app. These DLC files have been 
+-uploaded to https://github.com/mlcommons/mobile_models.
++uploaded with the other submission files to here: <path where needs to be uploaded>
+ 
+ ## Requirements
+ 
+ *   [SNPE SDK](https://developer.qualcomm.com/software/qualcomm-neural-processing-sdk)
+-    * Version 1.48.0
++    * Version 1.54.2
+ *   Linux machine capable of running Ubuntu 18.04 docker images
+ 
+ After downloading and unzipping the SNPE SDK, make sure to set SNPE_SDK to its location:
+ ```
+ cd /opt
+-unzip snpe-1.48.0.2554.zip
+-export SNPE_SDK=/opt/snpe-1.48.0.2554
++unzip snpe-1.54.2.2899.zip
++export SNPE_SDK=/opt/snpe-1.54.2.2899
+ ```
+ 
+ ### Optional
+@@ -72,10 +72,8 @@ The task config settings are embedded in libqtibackend.so. These settings contai
+ backend specific data for each task to be run. This backend assumes a few things about
+ the settings:
+ 
+-1. The MobileBERT task sets the configuration name to "TFLite GPU". The accelerator
+-   value is gpu_f16 to use TFLite GPU delegate.
+-2. All other models use "SNPE" for the configuration name and use "snpe aip", "snpe dsp",
+-   "psnpe aip", or "psnpe dsp" for the accelerator value when using SNPE.
++1. All the models use "SNPE" for the configuration name and use "snpe_aip", "snpe_dsp",
++   "psnpe_aip", or "psnpe_dsp" for the accelerator value when using SNPE.
+ 
+ ## FAQ
+ 
+@@ -85,12 +83,11 @@ No, the information to build the DLC files is only to show how they are created.
+ 
+ #### What devices does this backend support?
+ 
+-This backend only supports SDM865/SDM865 Pro and SDM888 devices. Other Snapdragon based
+-devices will not run the MLPerf app. Future updates of the app will provide
++This backend only supports SDM865/SDM865 Pro ,SDM888/SDM888 Pro and SDM778G devices. Other Snapdragon
++based devices will not run the MLPerf app. Future updates of the app will provide
+ additional device support.
+ 
+ #### Is SNPE used to run all the models?
+ 
+-No, there is a TFLite wrapper invoked by this backend to run the MobileBERT model. The
+-other models use SNPE.
++Yes. All the models use use SNPE for execution.
+ 
+diff --git a/mobile_back_qti/cpp/backend_qti/BUILD b/mobile_back_qti/cpp/backend_qti/BUILD
+index 27d814d..35d14bd 100644
+--- a/mobile_back_qti/cpp/backend_qti/BUILD
++++ b/mobile_back_qti/cpp/backend_qti/BUILD
+@@ -35,7 +35,8 @@ config_setting(
+ 
+ snpe_copts = [
+     "-Imobile_back_qti/" + SNPE_VERSION + "/include/zdl",
+-    "-fexceptions", "-lc++_shared"
++    "-fexceptions",
++    "-lc++_shared",
+ ]
+ 
+ load(
+@@ -47,7 +48,10 @@ load(
+ cc_library(
+     name = "qti_rpcmem",
+     srcs = ["rpcmem.cc"],
+-    hdrs = ["rpcmem.h"],
++    hdrs = [
++        "cpuctrl.h",
++        "rpcmem.h",
++    ],
+     copts = tflite_copts() + snpe_copts,
+     deps = ["@org_tensorflow//tensorflow/core:tflite_portable_logging"],
+     alwayslink = 1,
+diff --git a/mobile_back_qti/cpp/backend_qti/allocator.h b/mobile_back_qti/cpp/backend_qti/allocator.h
+index cea1f4b..e358b25 100644
+--- a/mobile_back_qti/cpp/backend_qti/allocator.h
++++ b/mobile_back_qti/cpp/backend_qti/allocator.h
+@@ -21,6 +21,7 @@ limitations under the License.
+ #include <memory>
+ 
+ #include "rpcmem.h"
++#include "tensorflow/core/platform/logging.h"
+ 
+ // This allocator assumes all allocations and frees are done in order
+ class ChunkAllocator {
+@@ -131,8 +132,10 @@ class ChunkAllocator {
+ };
+ 
+ template <class T>
+-struct Allocator {
++class Allocator {
++ public:
+   typedef T value_type;
++  static bool useIonBuffer;
+ 
+   Allocator() = default;
+ 
+@@ -140,20 +143,39 @@ struct Allocator {
+   constexpr Allocator(const Allocator<U> &) noexcept {}
+ 
+       [[nodiscard]] T *allocate(std::size_t n) {
+-    if (auto p = static_cast<T *>(
+-            ChunkAllocator::getRpcMem().Alloc(n * sizeof(T)))) {
+-      return p;
++    T *p;
++    if (useIonBuffer) {
++      p = static_cast<T *>(ChunkAllocator::getRpcMem().Alloc(n * sizeof(T)));
++    } else {
++      p = static_cast<T *>(std::malloc(n * sizeof(T)));
+     }
+-    return nullptr;
++    return p;
+   }
+ 
+   void deallocate(T *p, std::size_t n) noexcept {
+-    ChunkAllocator::getRpcMem().Free(p);
++    if (useIonBuffer) {
++      ChunkAllocator::getRpcMem().Free(p);
++    } else {
++      std::free(p);
++    }
++  }
++
++  static void useIonAllocator() {
++    useIonBuffer = true;
++    LOG(INFO) << "Using Ion Allocator";
++  }
++
++  static void useDefaultAllocator() {
++    useIonBuffer = false;
++    LOG(INFO) << "Using Default Allocator";
+   }
+ };
+ 
++template <class T>
++bool Allocator<T>::useIonBuffer = true;
++
+ static void *get_ion_buffer(size_t n) {
+-  void *p = ChunkAllocator::GetBuffer(n, 3);
++  void *p = ChunkAllocator::GetBuffer(n, 4);
+   // LOG(INFO) << "QTI backend SNPE allocator " << n << " bytes at " << p;
+   return p;
+ }
+diff --git a/mobile_back_qti/cpp/backend_qti/cpuctrl.cc b/mobile_back_qti/cpp/backend_qti/cpuctrl.cc
+index ec56980..e5533dc 100644
+--- a/mobile_back_qti/cpp/backend_qti/cpuctrl.cc
++++ b/mobile_back_qti/cpp/backend_qti/cpuctrl.cc
+@@ -31,26 +31,26 @@ using namespace std::chrono;
+ #define SET_AFFINITY(a, b) sched_setaffinity(gettid(), a, b)
+ #define GET_AFFINITY(a, b) sched_getaffinity(gettid(), a, b)
+ 
+-#define SLEEPMS 2
++static uint32_t soc_id_ = 0;
+ 
+-static uint32_t soc_id_g = 0;
+-
+-static bool active_g = false;
++static bool active_ = false;
++static uint32_t loadOffTime_ = 2;
++static uint32_t loadOnTime_ = 100;
+ static std::thread *thread_ = nullptr;
+-static cpu_set_t cpusetLow_g;
+-static cpu_set_t cpusetHigh_g;
+-static cpu_set_t cpusetall_g;
++static cpu_set_t cpusetLow_;
++static cpu_set_t cpusetHigh_;
++static cpu_set_t cpusetall_;
+ 
+ static void loop(void *unused) {
+   (void)unused;
+-  active_g = true;
+-  while (active_g) {
++  active_ = true;
++  while (active_) {
+     auto now =
+         duration_cast<milliseconds>(system_clock::now().time_since_epoch());
+-    if (now.count() % 100 == 0 && active_g) {
+-      usleep(SLEEPMS * 1000);
++    if (now.count() % loadOnTime_ == 0 && active_) {
++      usleep(loadOffTime_ * 1000);
+     } else {
+-      for (int i = 0; i < 100; i++) {
++      for (int i = 0; i < loadOnTime_; i++) {
+         // Prevent compiler from optimizing away busy loop
+         __asm__ __volatile__("" : "+g"(i) : :);
+       }
+@@ -58,15 +58,17 @@ static void loop(void *unused) {
+   }
+ }
+ 
+-void CpuCtrl::startLoad() {
+-  if (active_g) {
++void CpuCtrl::startLoad(uint32_t load_off_time, uint32_t load_on_time) {
++  if (active_) {
+     return;
+   }
++  loadOffTime_ = load_off_time;
++  loadOnTime_ = load_on_time;
+   thread_ = new std::thread(loop, nullptr);
+ }
+ 
+ void CpuCtrl::stopLoad() {
+-  active_g = false;
++  active_ = false;
+   if (thread_) {
+     thread_->join();
+   }
+@@ -74,11 +76,11 @@ void CpuCtrl::stopLoad() {
+   thread_ = nullptr;
+ }
+ 
+-void CpuCtrl::lowLatency() { SET_AFFINITY(sizeof(cpu_set_t), &cpusetLow_g); }
++void CpuCtrl::lowLatency() { SET_AFFINITY(sizeof(cpu_set_t), &cpusetLow_); }
+ 
+-void CpuCtrl::normalLatency() { SET_AFFINITY(sizeof(cpu_set_t), &cpusetall_g); }
++void CpuCtrl::normalLatency() { SET_AFFINITY(sizeof(cpu_set_t), &cpusetall_); }
+ 
+-void CpuCtrl::highLatency() { SET_AFFINITY(sizeof(cpu_set_t), &cpusetHigh_g); }
++void CpuCtrl::highLatency() { SET_AFFINITY(sizeof(cpu_set_t), &cpusetHigh_); }
+ 
+ bool CpuCtrl::isSnapDragon(const char *manufacturer) {
+   bool is_qcom = false;
+@@ -120,7 +122,7 @@ bool CpuCtrl::isSnapDragon(const char *manufacturer) {
+ }
+ 
+ uint32_t CpuCtrl::getSocId() {
+-  if (soc_id_g == 0) {
++  if (soc_id_ == 0) {
+     std::ifstream in_file;
+     std::vector<char> line(5);
+     in_file.open("/sys/devices/soc0/soc_id");
+@@ -133,13 +135,13 @@ uint32_t CpuCtrl::getSocId() {
+ 
+     in_file.read(line.data(), 5);
+     in_file.close();
+-    soc_id_g = (uint32_t)std::atoi(line.data());
++    soc_id_ = (uint32_t)std::atoi(line.data());
+ 
+     std::vector<uint32_t> allcores;
+     std::vector<uint32_t> low_latency_cores;
+     std::vector<uint32_t> high_latency_cores;
+     int maxcores = 0;
+-    if (soc_id_g == SDM888 || soc_id_g == SDM865) {
++    if (soc_id_ == SDM888 || soc_id_ == SDM865 || soc_id_ == SDM778) {
+       high_latency_cores.emplace_back(0);
+       high_latency_cores.emplace_back(1);
+       high_latency_cores.emplace_back(2);
+@@ -147,7 +149,7 @@ uint32_t CpuCtrl::getSocId() {
+       maxcores = 8;
+     }
+ 
+-    if (soc_id_g == SDM888 || soc_id_g == SDM865) {
++    if (soc_id_ == SDM888 || soc_id_ == SDM865 || soc_id_ == SDM778) {
+       low_latency_cores.emplace_back(4);
+       low_latency_cores.emplace_back(5);
+       low_latency_cores.emplace_back(6);
+@@ -159,19 +161,19 @@ uint32_t CpuCtrl::getSocId() {
+       allcores.emplace_back(i);
+     }
+ 
+-    CPU_ZERO(&cpusetLow_g);
++    CPU_ZERO(&cpusetLow_);
+     for (auto core : low_latency_cores) {
+-      CPU_SET(core, &cpusetLow_g);
++      CPU_SET(core, &cpusetLow_);
+     }
+-    CPU_ZERO(&cpusetHigh_g);
++    CPU_ZERO(&cpusetHigh_);
+     for (auto core : high_latency_cores) {
+-      CPU_SET(core, &cpusetHigh_g);
++      CPU_SET(core, &cpusetHigh_);
+     }
+-    CPU_ZERO(&cpusetall_g);
++    CPU_ZERO(&cpusetall_);
+     for (auto core : allcores) {
+-      CPU_SET(core, &cpusetall_g);
++      CPU_SET(core, &cpusetall_);
+     }
+   }
+-  LOG(INFO) << "SOC ID is " << soc_id_g;
+-  return soc_id_g;
++  LOG(INFO) << "SOC ID is " << soc_id_;
++  return soc_id_;
+ }
+diff --git a/mobile_back_qti/cpp/backend_qti/cpuctrl.h b/mobile_back_qti/cpp/backend_qti/cpuctrl.h
+index a778661..f1b56d5 100644
+--- a/mobile_back_qti/cpp/backend_qti/cpuctrl.h
++++ b/mobile_back_qti/cpp/backend_qti/cpuctrl.h
+@@ -14,16 +14,17 @@ limitations under the License.
+ ==============================================================================*/
+ #pragma once
+ 
+-#include <stdint.h>
+ #include <EGL/egl.h>
+ #include <GLES/gl.h>
++#include <stdint.h>
+ 
+ #define SDM865 356
+ #define SDM888 415
++#define SDM778 475
+ 
+ class CpuCtrl {
+  public:
+-  static void startLoad();
++  static void startLoad(uint32_t load_off_time, uint32_t load_on_time);
+   static void stopLoad();
+   static void lowLatency();
+   static void normalLatency();
+diff --git a/mobile_back_qti/cpp/backend_qti/mlperf_helper.h b/mobile_back_qti/cpp/backend_qti/mlperf_helper.h
+index 5612c07..908d8de 100644
+--- a/mobile_back_qti/cpp/backend_qti/mlperf_helper.h
++++ b/mobile_back_qti/cpp/backend_qti/mlperf_helper.h
+@@ -22,15 +22,19 @@ limitations under the License.
+ 
+ static void process_config(const mlperf_backend_configuration_t *configs,
+                            QTIBackendHelper *backend_data) {
+-  backend_data->is_tflite_ = false;
++  backend_data->isTflite_ = false;
+   backend_data->batchSize_ = 1;
+   backend_data->useSnpe_ = false;
++  backend_data->perfProfile_ = zdl::DlSystem::PerformanceProfile_t::BURST;
++  backend_data->loadOffTime_ = 2;
++  backend_data->loadOnTime_ = 100;
++  backend_data->useIonBuffers_ = true;
+ 
+   std::string &delegate = backend_data->delegate_;
+   delegate = configs->accelerator;
+-  if ((delegate == "gpu_f16") || (delegate == "nnapi-qti-dsp") ||
+-      (delegate == "nnapi-qti-gpu")) {
+-    backend_data->is_tflite_ = true;
++  if ((delegate == "gpu_f16") || (delegate == "nnapi_qti-dsp") ||
++      (delegate == "nnapi_qti-gpu")) {
++    backend_data->isTflite_ = true;
+   } else if (strncmp(configs->accelerator, "snpe", 4) == 0) {
+     backend_data->useSnpe_ = true;
+   } else if (strncmp(configs->accelerator, "psnpe", 5) == 0) {
+@@ -44,23 +48,91 @@ static void process_config(const mlperf_backend_configuration_t *configs,
+       (configs->batch_size == 0) ? 1 : configs->batch_size;
+ 
+   // Handle custom settings
++  std::string perfProfile = "burst";
+   for (int i = 0; i < configs->count; ++i) {
+     if (strcmp(configs->keys[i], "scenario") == 0) {
+       backend_data->scenario_ = configs->values[i];
+-    } else if (strcmp(configs->keys[i], "snpeOutputLayers") == 0) {
+-      backend_data->snpe_output_layers_ = configs->values[i];
+-    } else if (strcmp(configs->keys[i], "bgLoad") == 0) {
++    } else if (strcmp(configs->keys[i], "snpe_output_layers") == 0) {
++      backend_data->snpeOutputLayers_ = configs->values[i];
++    } else if (strcmp(configs->keys[i], "bg_load") == 0) {
+       backend_data->bgLoad_ = true;
++    } else if (strcmp(configs->keys[i], "load_off_time") == 0) {
++      backend_data->loadOffTime_ = atoi(configs->values[i]);
++    } else if (strcmp(configs->keys[i], "load_on_time") == 0) {
++      backend_data->loadOnTime_ = atoi(configs->values[i]);
++    } else if (strcmp(configs->keys[i], "input_buffer_type") == 0) {
++      if (std::strcmp(configs->values[i], "float_32") == 0) {
++        backend_data->inputBufferType_ =
++            QTIBackendHelper::QTIBufferType::FLOAT_32;
++      } else {
++        backend_data->inputBufferType_ =
++            QTIBackendHelper::QTIBufferType::UINT_8;
++      }
++    } else if (strcmp(configs->keys[i], "output_buffer_type") == 0) {
++      if (std::strcmp(configs->values[i], "float_32") == 0) {
++        backend_data->outputBufferType_ =
++            QTIBackendHelper::QTIBufferType::FLOAT_32;
++      } else {
++        backend_data->outputBufferType_ =
++            QTIBackendHelper::QTIBufferType::UINT_8;
++      }
++    } else if (strcmp(configs->keys[i], "use_ion_buffer") == 0) {
++      if (std::strcmp(configs->values[i], "true") == 0) {
++        backend_data->useIonBuffers_ = true;
++      } else {
++        backend_data->useIonBuffers_ = false;
++      }
++    } else if (strcmp(configs->keys[i], "perf_profile") == 0) {
++      perfProfile = configs->values[i];
++      if ((std::strcmp(configs->values[i], "default") == 0) ||
++          (std::strcmp(configs->values[i], "balanced") == 0)) {
++        backend_data->perfProfile_ =
++            zdl::DlSystem::PerformanceProfile_t::BALANCED;
++      } else if (std::strcmp(configs->values[i], "high_performance") == 0) {
++        backend_data->perfProfile_ =
++            zdl::DlSystem::PerformanceProfile_t::HIGH_PERFORMANCE;
++      } else if (std::strcmp(configs->values[i], "power_saver") == 0) {
++        backend_data->perfProfile_ =
++            zdl::DlSystem::PerformanceProfile_t::POWER_SAVER;
++      } else if (std::strcmp(configs->values[i], "system_settings") == 0) {
++        backend_data->perfProfile_ =
++            zdl::DlSystem::PerformanceProfile_t::SYSTEM_SETTINGS;
++      } else if (std::strcmp(configs->values[i],
++                             "sustained_high_performance") == 0) {
++        backend_data->perfProfile_ =
++            zdl::DlSystem::PerformanceProfile_t::SUSTAINED_HIGH_PERFORMANCE;
++      } else if (std::strcmp(configs->values[i], "burst") == 0) {
++        backend_data->perfProfile_ = zdl::DlSystem::PerformanceProfile_t::BURST;
++      } else if (std::strcmp(configs->values[i], "low_power_saver") == 0) {
++        backend_data->perfProfile_ =
++            zdl::DlSystem::PerformanceProfile_t::LOW_POWER_SAVER;
++      } else if (std::strcmp(configs->values[i], "high_power_saver") == 0) {
++        backend_data->perfProfile_ =
++            zdl::DlSystem::PerformanceProfile_t::HIGH_POWER_SAVER;
++      } else if (std::strcmp(configs->values[i], "low_balanced") == 0) {
++        backend_data->perfProfile_ =
++            zdl::DlSystem::PerformanceProfile_t::LOW_BALANCED;
++      } else {
++        LOG(INFO) << "Unrecognized performance profile: " << perfProfile;
++        backend_data->perfProfile_ = zdl::DlSystem::PerformanceProfile_t::BURST;
++        perfProfile = "burst";
++      }
+     }
+   }
+ 
+   LOG(INFO) << "Config: delegate: " << delegate
+-            << " scenario: " << backend_data->scenario_
+-            << " output: " << backend_data->snpe_output_layers_
+-            << " isTfLite: " << backend_data->is_tflite_
+-            << " batchSize: " << backend_data->batchSize_
+-            << " useSNPE: " << backend_data->useSnpe_
+-            << " bgLoad: " << backend_data->bgLoad_;
++            << " | scenario: " << backend_data->scenario_
++            << " | output: " << backend_data->snpeOutputLayers_
++            << " | isTfLite: " << backend_data->isTflite_
++            << " | batchSize: " << backend_data->batchSize_
++            << " | useSNPE: " << backend_data->useSnpe_
++            << " | bgLoad: " << backend_data->bgLoad_
++            << " | loadOffTime: " << backend_data->loadOffTime_
++            << " | loadOnTime_: " << backend_data->loadOnTime_
++            << " | inputBufferType: " << backend_data->inputBufferType_
++            << " | outputBufferType: " << backend_data->outputBufferType_
++            << " | perfProfile: " << perfProfile
++            << " | useIonBuffer: " << backend_data->useIonBuffers_;
+ }
+ 
+ #endif
+diff --git a/mobile_back_qti/cpp/backend_qti/qti_backend_helper.cc b/mobile_back_qti/cpp/backend_qti/qti_backend_helper.cc
+index 6fe18cb..a4d46e8 100644
+--- a/mobile_back_qti/cpp/backend_qti/qti_backend_helper.cc
++++ b/mobile_back_qti/cpp/backend_qti/qti_backend_helper.cc
+@@ -41,6 +41,8 @@ limitations under the License.
+ 
+ int isSignedStatus = DEFAULT;
+ 
++enum snpe_runtimes_t { SNPE_DSP = 0, SNPE_AIP = 1, SNPE_GPU = 2, SNPE_CPU = 3 };
++
+ static long calcSizeFromDims(const size_t rank,
+                              const zdl::DlSystem::Dimension *dims) {
+   if (rank == 0) return 0;
+@@ -95,61 +97,61 @@ static std::vector<size_t> calcStrides(zdl::DlSystem::TensorShape dims,
+   return strides;
+ }
+ 
+-static zdl::DlSystem::Runtime_t Str2Delegate(const std::string &delegate) {
+-  if (absl::AsciiStrToLower(delegate) == "snpe dsp") {
+-    if (!zdl::SNPE::SNPEFactory::isRuntimeAvailable(
+-            zdl::DlSystem::Runtime_t::DSP,
+-            zdl::DlSystem::RuntimeCheckOption_t::BASIC_CHECK)) {
+-      // This platform supports DSP runtime
+-      LOG(FATAL) << "DSP runtime is not available on this platform";
+-    } else {
+-      if (isSignedStatus == DEFAULT) {
++static zdl::DlSystem::Runtime_t Str2Delegate(const snpe_runtimes_t delegate) {
++  zdl::DlSystem::Runtime_t runtime;
++  bool isDSP = false;
++
++  switch (delegate) {
++    case SNPE_DSP:
++      runtime = zdl::DlSystem::Runtime_t::DSP;
++      isDSP = true;
++      break;
++    case SNPE_AIP:
++      runtime = zdl::DlSystem::Runtime_t::AIP_FIXED_TF;
++      isDSP = true;
++      break;
++    case SNPE_GPU:
++      runtime = zdl::DlSystem::Runtime_t::GPU;
++      break;
++    case SNPE_CPU:
++      runtime = zdl::DlSystem::Runtime_t::CPU;
++      break;
++    default:
++      LOG(ERROR) << "runtime not supported";
++      break;
++  }
++
++  if (isDSP) {
++    if (isSignedStatus == DEFAULT) {
++      if (zdl::SNPE::SNPEFactory::isRuntimeAvailable(
++              runtime, zdl::DlSystem::RuntimeCheckOption_t::NORMAL_CHECK)) {
++        isSignedStatus = SIGNED_PD;
++        LOG(INFO) << "runtime " << delegate
++                  << " is available on this platform with SignedPD";
++      } else {
+         if (zdl::SNPE::SNPEFactory::isRuntimeAvailable(
+-                zdl::DlSystem::Runtime_t::DSP,
+-                zdl::DlSystem::RuntimeCheckOption_t::NORMAL_CHECK)) {
+-          isSignedStatus = SIGNED_PD;
+-          LOG(INFO)
+-              << "DSP runtime is available on this platform with SignedPD";
+-        } else {
++                runtime,
++                zdl::DlSystem::RuntimeCheckOption_t::UNSIGNEDPD_CHECK)) {
+           isSignedStatus = UNSIGNED_PD;
+-          LOG(INFO)
+-              << "DSP runtime is available on this platform with UnSignedPD";
+-        }
+-      }
+-      return zdl::DlSystem::Runtime_t::DSP;
+-    }
+-  } else if (absl::AsciiStrToLower(delegate) == "snpe aip") {
+-    if (!zdl::SNPE::SNPEFactory::isRuntimeAvailable(
+-            zdl::DlSystem::Runtime_t::AIP_FIXED_TF,
+-            zdl::DlSystem::RuntimeCheckOption_t::BASIC_CHECK)) {
+-      // This platform supports AIP runtime
+-      LOG(FATAL) << "AIP runtime is not available on this platform";
+-    } else {
+-      if (isSignedStatus == DEFAULT) {
+-        if (zdl::SNPE::SNPEFactory::isRuntimeAvailable(
+-                zdl::DlSystem::Runtime_t::AIP_FIXED_TF,
+-                zdl::DlSystem::RuntimeCheckOption_t::NORMAL_CHECK)) {
+-          isSignedStatus = SIGNED_PD;
+-          LOG(INFO)
+-              << "AIP runtime is available on this platform with SignedPD";
++          LOG(INFO) << "runtime " << delegate
++                    << " is available on this platform with UnsignedPD";
+         } else {
+-          isSignedStatus = UNSIGNED_PD;
+-          LOG(INFO)
+-              << "AIP runtime is available on this platform with UnSignedPD";
++          // This platform doesn't support DSP runtime
++          LOG(FATAL) << "runtime " << delegate
++                     << " is not available on this platform";
+         }
+       }
+-      return zdl::DlSystem::Runtime_t::AIP_FIXED_TF;
+     }
+-  } else if (absl::AsciiStrToLower(delegate) == "snpe gpu") {
+-    if (!zdl::SNPE::SNPEFactory::isRuntimeAvailable(
+-            zdl::DlSystem::Runtime_t::GPU)) {
+-      LOG(FATAL) << "GPU runtime is not available on this platform";
++    return runtime;
++  } else {
++    if (!zdl::SNPE::SNPEFactory::isRuntimeAvailable(runtime)) {
++      LOG(FATAL) << "runtime " << delegate
++                 << " is not available on this platform";
+     } else {
+-      LOG(INFO) << "GPU runtime is available on this platform";
+-      return zdl::DlSystem::Runtime_t::GPU;
++      LOG(INFO) << "runtime " << delegate << " is available on this platform";
++      return runtime;
+     }
+   }
+-  return zdl::DlSystem::Runtime_t::CPU;
+ }
+ 
+ void QTIBackendHelper::use_psnpe(const char *model_path) {
+@@ -178,7 +180,7 @@ void QTIBackendHelper::use_psnpe(const char *model_path) {
+         zdl::PSNPE::InputOutputTransmissionMode::sync;
+ 
+     zdl::DlSystem::StringList outputLayers =
+-        ResolveOutputLayerNames(snpe_output_layers_);
++        ResolveOutputLayerNames(snpeOutputLayers_);
+ 
+     zdl::SNPE::SNPEBuilder snpeBuilder(container.get());
+     snpeBuilder.setOutputLayers(outputLayers);
+@@ -194,10 +196,12 @@ void QTIBackendHelper::use_psnpe(const char *model_path) {
+     }
+ 
+     // These features are not for SDM865, so turning them off.
+-    if (useDspFeatures && soc_id == SDM888) {
++    if (useDspFeatures && (soc_id == SDM888 || soc_id == SDM778)) {
+       // use Zero copy for input and output buffers.
+       // Requires rpc registered ion buffers.
+-      platformOptionStr += ";useDspZeroCopy:ON";
++      if (useIonBuffers_) {
++        platformOptionStr += ";useDspZeroCopy:ON";
++      }
+       platformOptionStr += ";dspPowerSettingContext:ON";
+       buildConfig.enableInitCache = true;
+     }
+@@ -240,10 +244,9 @@ void QTIBackendHelper::use_snpe(const char *model_path) {
+ 
+     zdl::SNPE::SNPEBuilder snpeBuilder(container.get());
+     zdl::DlSystem::StringList outputLayers =
+-        ResolveOutputLayerNames(snpe_output_layers_);
++        ResolveOutputLayerNames(snpeOutputLayers_);
+ 
+-    snpeBuilder
+-        .setPerformanceProfile(zdl::DlSystem::PerformanceProfile_t::BURST)
++    snpeBuilder.setPerformanceProfile(perfProfile_)
+         .setExecutionPriorityHint(zdl::DlSystem::ExecutionPriorityHint_t::HIGH)
+         .setRuntimeProcessorOrder(inputRuntimeList)
+         .setUseUserSuppliedBuffers(true)
+@@ -256,10 +259,12 @@ void QTIBackendHelper::use_snpe(const char *model_path) {
+     }
+ 
+     // These features are not for SDM865, so turning them off.
+-    if (useDspFeatures && soc_id == SDM888) {
++    if (useDspFeatures && (soc_id == SDM888 || soc_id == SDM778)) {
+       // use Zero copy for input and output buffers.
+       // Requires rpc registered ion buffers.
+-      platformOptionStr += ";useDspZeroCopy:ON";
++      if (useIonBuffers_) {
++        platformOptionStr += ";useDspZeroCopy:ON";
++      }
+       platformOptionStr += ";dspPowerSettingContext:ON";
+       snpeBuilder.setInitCacheMode(true);
+     }
+@@ -289,52 +294,63 @@ inline int QTIBackendHelper::get_num_inits() {
+   }
+ }
+ 
+-void QTIBackendHelper::get_accelerator_instances(int &numDSP, int &numAIP,
+-                                                 int &numGPU, int &numCPU) {
++void QTIBackendHelper::get_accelerator_instances(int &num_dsp, int &num_aip,
++                                                 int &num_gpu, int &num_cpu) {
+   uint32_t soc_id = CpuCtrl::getSocId();
+   std::string &delegate = delegate_;
++  num_dsp = 0;
++  num_aip = 0;
++  num_gpu = 0;
++  num_cpu = 0;
+   if (scenario_ == "Offline") {
+     // For 865 use DSP+AIP
+     if (soc_id == SDM865) {
+-      if (delegate != "snpe aip" && delegate != "psnpe aip") {
++      if (delegate != "snpe_aip" && delegate != "psnpe_aip") {
+         LOG(FATAL) << "Error: Unsupported delegate for offline mode";
+       }
+       useDspFeatures = true;
+-      numDSP = 2;
+-      numAIP = 6;
++      num_dsp = 1;
++      num_aip = 6;
+     } else if (soc_id == SDM888) {
+-      if (delegate != "snpe dsp" && delegate != "psnpe dsp") {
++      if (delegate != "snpe_dsp" && delegate != "psnpe_dsp") {
++        LOG(FATAL) << "Error: Unsupported delegate for offline mode";
++      }
++      useDspFeatures = true;
++      num_dsp = 2;
++      num_gpu = 4;
++    } else if (soc_id == SDM778) {
++      if (delegate != "snpe_dsp" && delegate != "psnpe_dsp") {
+         LOG(FATAL) << "Error: Unsupported delegate for offline mode";
+       }
+       useDspFeatures = true;
+-      numDSP = 2;
+-      numAIP = 0;
++      num_dsp = 2;
++      num_gpu = 4;
+     }
+   } else {
+-    if (delegate == "snpe dsp" || delegate == "psnpe dsp") {
+-      numDSP = 1;
++    if (delegate == "snpe_dsp" || delegate == "psnpe_dsp") {
++      num_dsp = 1;
+       useDspFeatures = true;
+-    } else if (delegate == "snpe aip" || delegate == "psnpe aip") {
+-      numAIP = 1;
++    } else if (delegate == "snpe_aip" || delegate == "psnpe_aip") {
++      num_aip = 1;
+       useDspFeatures = true;
+-    } else if (delegate == "snpe gpu" || delegate == "psnpe gpu") {
+-      numGPU = 1;
++    } else if (delegate == "snpe_gpu" || delegate == "psnpe_gpu") {
++      num_gpu = 1;
+       useDspFeatures = false;
+-    } else if (delegate == "snpe cpu" || delegate == "psnpe cpu") {
+-      numCPU = 1;
++    } else if (delegate == "snpe_cpu" || delegate == "psnpe_cpu") {
++      num_cpu = 1;
+       useDspFeatures = false;
+     } else {
+       LOG(FATAL) << "Error: Unsupported delegate " << delegate << " SoC ID "
+                  << soc_id;
+     }
+   }
+-  LOG(INFO) << "Using " << numDSP << " dsp " << numAIP << " aip " << numGPU
+-            << " gpu and " << numCPU << " cpu";
++  LOG(INFO) << "Using " << num_dsp << " dsp " << num_aip << " aip " << num_gpu
++            << " gpu and " << num_cpu << " cpu";
+ }
+ 
+ void QTIBackendHelper::map_inputs() {
+   zdl::DlSystem::UserBufferMap inputMap;
+-  for (int bi = 0; bi < batchSize_ / input_batch_; bi++) {
++  for (int bi = 0; bi < batchSize_ / inputBatch_; bi++) {
+     for (const auto &name : networkInputTensorNames_) {
+       zdl::DlSystem::IUserBufferFactory &ubFactory =
+           zdl::SNPE::SNPEFactory::getUserBufferFactory();
+@@ -344,8 +360,8 @@ void QTIBackendHelper::map_inputs() {
+       std::vector<size_t> strides;
+       std::unique_ptr<zdl::DlSystem::IUserBuffer> ubPtr;
+ 
+-      if ((*ubaOpt)->getEncodingType() ==
+-          zdl::DlSystem::UserBufferEncoding::ElementType_t::FLOAT) {
++      LOG(INFO) << "inputbuffer: " << inputBufferType_ << " name: " << name;
++      if (inputBufferType_ == QTIBufferType::FLOAT_32) {
+         // Prepare float buffer
+         bufSize *= sizeof(float);
+         std::vector<uint8_t> inputBuffer(bufSize);
+@@ -370,7 +386,7 @@ void QTIBackendHelper::map_inputs() {
+         // Set the default QP for model which doesn't have QP.
+         // HTP may not need to use the QP for the current set of DLCs
+         // This may be required for AIP though.
+-        LOG(INFO) << "QP parameters from model: " << ubeTfN;
++        // LOG(INFO) << "QP parameters from model: " << ubeTfN;
+         if (!ubeTfN) ubeTfN = &temp;
+ 
+         ubPtr = ubFactory.createUserBuffer(std::move(inputBuffer.data()),
+@@ -380,29 +396,47 @@ void QTIBackendHelper::map_inputs() {
+     }
+     inputMap_.push_back(inputMap);
+   }
+-  bufs_.resize(batchSize_ / input_batch_);
++  bufs_.resize(batchSize_ / inputBatch_);
+ }
+ 
+ void QTIBackendHelper::map_outputs() {
+   zdl::DlSystem::UserBufferMap outputMap;
+   zdl::DlSystem::IUserBufferFactory &ubFactory =
+       zdl::SNPE::SNPEFactory::getUserBufferFactory();
+-  for (int bi = 0; bi < batchSize_ / input_batch_; bi++) {
++  for (int bi = 0; bi < batchSize_ / inputBatch_; bi++) {
+     for (const auto &name : networkOutputTensorNames_) {
+       auto ubaOpt = snpe_->getInputOutputBufferAttributes(name);
+       long bufSize = calcSizeFromDims((*ubaOpt)->getDims().rank(),
+                                       (*ubaOpt)->getDims().getDimensions());
+ 
+-      output_batch_bufsize_ = bufSize;
+-      zdl::DlSystem::UserBufferEncodingFloat userBufferEncodingFloat;
+-      bufs_[bi].emplace(
+-          std::string(name),
+-          std::vector<uint8_t, Allocator<uint8_t>>(bufSize * sizeof(float)));
+-      auto x = ubFactory.createUserBuffer(
+-          bufs_[bi].at(name).data(), bufSize * sizeof(float),
+-          calcStrides((*ubaOpt)->getDims(), sizeof(float)),
+-          &userBufferEncodingFloat);
+-      outputMap.add(name, x.release());
++      outputBatchBufsize_ = bufSize;
++      LOG(INFO) << "outputBufferType: " << outputBufferType_
++                << " name: " << name;
++      if (useIonBuffers_) {
++        Allocator<uint8_t>::useIonAllocator();
++      } else {
++        Allocator<uint8_t>::useDefaultAllocator();
++      }
++      if (outputBufferType_ == QTIBufferType::UINT_8) {
++        zdl::DlSystem::UserBufferEncodingTfN ubeTfN(0, 1.0f, 8);
++        bufs_[bi].emplace(std::string(name),
++                          std::vector<uint8_t, Allocator<uint8_t>>(
++                              bufSize * sizeof(uint8_t)));
++        auto x = ubFactory.createUserBuffer(
++            bufs_[bi].at(name).data(), bufSize * sizeof(uint8_t),
++            calcStrides((*ubaOpt)->getDims(), sizeof(uint8_t)), &ubeTfN);
++        outputMap.add(name, x.release());
++      } else {
++        zdl::DlSystem::UserBufferEncodingFloat userBufferEncodingFloat;
++        bufs_[bi].emplace(
++            std::string(name),
++            std::vector<uint8_t, Allocator<uint8_t>>(bufSize * sizeof(float)));
++        auto x = ubFactory.createUserBuffer(
++            bufs_[bi].at(name).data(), bufSize * sizeof(float),
++            calcStrides((*ubaOpt)->getDims(), sizeof(float)),
++            &userBufferEncodingFloat);
++        outputMap.add(name, x.release());
++      }
+     }
+     outputMap_.push_back(outputMap);
+   }
+@@ -417,14 +451,21 @@ void QTIBackendHelper::get_data_formats() {
+ 
+   zdl::DlSystem::TensorShape tensorShape;
+   tensorShape = snpe_->getInputDimensions();
+-  input_batch_ = tensorShape.getDimensions()[0];
++  inputBatch_ = tensorShape.getDimensions()[0];
+ 
+   for (const auto &name : networkInputTensorNames_) {
+     auto ubaOpt = snpe_->getInputOutputBufferAttributes(name);
+     long bufSize = calcSizeFromDims((*ubaOpt)->getDims().rank(),
+                                     (*ubaOpt)->getDims().getDimensions());
+-    input_format_.push_back(
+-        {mlperf_data_t::Type::Uint8, bufSize / input_batch_});
++    if (inputBufferType_ == FLOAT_32) {
++      // Input buffer type FLOAT
++      inputFormat_.push_back(
++          {mlperf_data_t::Type::Float32, bufSize / inputBatch_});
++    } else {
++      // Input buffer type UINT8
++      inputFormat_.push_back(
++          {mlperf_data_t::Type::Uint8, bufSize / inputBatch_});
++    }
+   }
+ 
+   const auto &strList_output = snpe_->getOutputTensorNames();
+@@ -437,8 +478,28 @@ void QTIBackendHelper::get_data_formats() {
+     auto ubaOpt = snpe_->getInputOutputBufferAttributes(name);
+     long bufSize = calcSizeFromDims((*ubaOpt)->getDims().rank(),
+                                     (*ubaOpt)->getDims().getDimensions());
+-    output_format_.push_back(
+-        {mlperf_data_t::Type::Float32, bufSize / input_batch_});
++    if (outputBufferType_ == FLOAT_32) {
++      if (snpeOutputLayers_ == "transpose") {
++        // For mobileBERT, return output size as half the size of computed
++        // values,
++        // because the DLC returns only single layer as output but the app needs
++        // 2 tensors,
++        // split from the single tensor
++        bufSize = bufSize / 2;
++        outputFormat_.push_back(
++            {mlperf_data_t::Type::Float32, bufSize / inputBatch_});
++        outputFormat_.push_back(
++            {mlperf_data_t::Type::Float32, bufSize / inputBatch_});
++      } else {
++        // output buffer type FLOAT
++        outputFormat_.push_back(
++            {mlperf_data_t::Type::Float32, bufSize / inputBatch_});
++      }
++    } else {
++      // output buffer type UINT8
++      outputFormat_.push_back(
++          {mlperf_data_t::Type::Uint8, bufSize / inputBatch_});
++    }
+   }
+ }
+ 
+@@ -449,44 +510,44 @@ void QTIBackendHelper::set_runtime_config() {
+   zdl::DlSystem::Runtime_t runtime;
+   for (int i = 0; i < numDSP; i++) {
+     if (i == 0) {
+-      runtime = Str2Delegate("snpe dsp");
++      runtime = Str2Delegate(SNPE_DSP);
+     }
+     zdl::PSNPE::RuntimeConfig runtimeConfig;
+     runtimeConfig.runtime = runtime;
+-    runtimeConfig.perfProfile = zdl::DlSystem::PerformanceProfile_t::BURST;
++    runtimeConfig.perfProfile = perfProfile_;
+     runtimeConfigsList.push_back(runtimeConfig);
+     inputRuntimeList.add(runtime);
+   }
+ 
+   for (int i = 0; i < numAIP; i++) {
+     if (i == 0) {
+-      runtime = Str2Delegate("snpe aip");
++      runtime = Str2Delegate(SNPE_AIP);
+     }
+     zdl::PSNPE::RuntimeConfig runtimeConfig;
+     runtimeConfig.runtime = runtime;
+-    runtimeConfig.perfProfile = zdl::DlSystem::PerformanceProfile_t::BURST;
++    runtimeConfig.perfProfile = perfProfile_;
+     runtimeConfigsList.push_back(runtimeConfig);
+     inputRuntimeList.add(runtime);
+   }
+ 
+   for (int i = 0; i < numGPU; i++) {
+     if (i == 0) {
+-      runtime = Str2Delegate("snpe gpu");
++      runtime = Str2Delegate(SNPE_GPU);
+     }
+     zdl::PSNPE::RuntimeConfig runtimeConfig;
+     runtimeConfig.runtime = runtime;
+-    runtimeConfig.perfProfile = zdl::DlSystem::PerformanceProfile_t::BURST;
++    runtimeConfig.perfProfile = perfProfile_;
+     runtimeConfigsList.push_back(runtimeConfig);
+     inputRuntimeList.add(runtime);
+   }
+ 
+   for (int i = 0; i < numCPU; i++) {
+     if (i == 0) {
+-      runtime = Str2Delegate("snpe cpu");
++      runtime = Str2Delegate(SNPE_CPU);
+     }
+     zdl::PSNPE::RuntimeConfig runtimeConfig;
+     runtimeConfig.runtime = runtime;
+-    runtimeConfig.perfProfile = zdl::DlSystem::PerformanceProfile_t::BURST;
++    runtimeConfig.perfProfile = perfProfile_;
+     runtimeConfigsList.push_back(runtimeConfig);
+     inputRuntimeList.add(runtime);
+   }
+diff --git a/mobile_back_qti/cpp/backend_qti/qti_backend_helper.h b/mobile_back_qti/cpp/backend_qti/qti_backend_helper.h
+index d6417d2..4fc32b9 100644
+--- a/mobile_back_qti/cpp/backend_qti/qti_backend_helper.h
++++ b/mobile_back_qti/cpp/backend_qti/qti_backend_helper.h
+@@ -40,13 +40,15 @@ class QTIBackendHelper {
+                                  int &numCPU);
+ 
+  public:
++  enum QTIBufferType { FLOAT_32 = 0, UINT_8 = 1 };
+   using GetBufferFn = std::add_pointer<void *(size_t)>::type;
+   using ReleaseBufferFn = std::add_pointer<void(void *)>::type;
+ 
++  // FIXME use the name style fooBar or foo_bar but not a mix of both
+   const char *name_ = "snpe";
+-  std::string snpe_output_layers_;
+-  std::vector<mlperf_data_t> input_format_;
+-  std::vector<mlperf_data_t> output_format_;
++  std::string snpeOutputLayers_;
++  std::vector<mlperf_data_t> inputFormat_;
++  std::vector<mlperf_data_t> outputFormat_;
+   std::unique_ptr<zdl::PSNPE::PSNPE> psnpe_;
+   std::unique_ptr<zdl::SNPE::SNPE> snpe_;
+   zdl::PSNPE::UserBufferList inputMap_, outputMap_;
+@@ -56,17 +58,24 @@ class QTIBackendHelper {
+   std::string scenario_;
+   zdl::DlSystem::StringList networkInputTensorNames_;
+   zdl::DlSystem::StringList networkOutputTensorNames_;
+-  bool is_tflite_;
++  zdl::DlSystem::PerformanceProfile_t perfProfile_;
++
++  bool isTflite_;
+   bool useSnpe_;
+-  mlperf_backend_ptr_t tflite_backend;
++  mlperf_backend_ptr_t tfliteBackend_;
+   int batchSize_;
+-  int input_batch_;
+-  int output_batch_bufsize_;
+-  GetBufferFn get_buffer_;
+-  ReleaseBufferFn release_buffer_;
++  int inputBatch_;
++  int outputBatchBufsize_;
++  GetBufferFn getBuffer_;
++  ReleaseBufferFn releaseBuffer_;
+   bool bgLoad_;
+   std::string delegate_;
++  QTIBufferType inputBufferType_ = UINT_8;
++  QTIBufferType outputBufferType_ = FLOAT_32;
+   bool useDspFeatures = false;
++  uint32_t loadOffTime_ = 2;
++  uint32_t loadOnTime_ = 100;
++  bool useIonBuffers_ = true;
+ 
+   /* exposed functions */
+   void use_psnpe(const char *model_path);
+diff --git a/mobile_back_qti/cpp/backend_qti/qti_c.cc b/mobile_back_qti/cpp/backend_qti/qti_c.cc
+index c665e4d..a30a83c 100644
+--- a/mobile_back_qti/cpp/backend_qti/qti_c.cc
++++ b/mobile_back_qti/cpp/backend_qti/qti_c.cc
+@@ -19,12 +19,12 @@ limitations under the License.
+ #include "allocator.h"
+ #include "cpuctrl.h"
+ #include "mlperf_helper.h"
+-#include "qti_settings.h"
+ #include "qti_backend_helper.h"
++#include "qti_settings.h"
+ #include "tensorflow/core/platform/logging.h"
+ #include "tflite_c.h"
+ 
+-static QTIBackendHelper *backend_data_g = nullptr;
++static QTIBackendHelper *backend_data_ = nullptr;
+ 
+ #ifdef __cplusplus
+ extern "C" {
+@@ -54,33 +54,37 @@ bool mlperf_backend_matches_hardware(const char **not_allowed_message,
+   }
+ 
+   // Check if this SoC is supported
+-
+-  if (isQSoC && (soc_id == SDM865 || soc_id == SDM888)) {
+-    // it's a QTI SOC, and the chipset is supported
+-    *not_allowed_message = nullptr;
+-    if (soc_id == SDM865) {
+-      *settings = qti_settings_sdm865.c_str();
+-    } else {
+-      *settings = qti_settings_sdm888.c_str();
++  if (isQSoC) {
++    switch (soc_id) {
++      // it's a QTI SOC, and the chipset is supported
++      *not_allowed_message = nullptr;
++      case SDM865:
++        *settings = qti_settings_sdm865.c_str();
++        break;
++      case SDM888:
++        *settings = qti_settings_sdm888.c_str();
++        break;
++      case SDM778:
++        *settings = qti_settings_sdm778.c_str();
++        break;
++      default:
++        // it's a QTI SOC, but the chipset is not yet supported
++        *not_allowed_message = "Unsupported QTI SoC";
++        *settings = empty_settings.c_str();
++        break;
+     }
+     return true;
+-  } else if (isQSoC) {
+-    // it's a QTI SOC, but the chipset is not yet supported
+-    *not_allowed_message = "Unsupported QTI SoC";
+-    *settings = empty_settings.c_str();
+-    return true;
+   }
+ 
+   // It's not a QTI SOC, so set pbData to NULL
+   *settings = nullptr;
+   return false;
+ }
+-
+ // Create a new backend and return the pointer to it.
+ mlperf_backend_ptr_t mlperf_backend_create(
+     const char *model_path, mlperf_backend_configuration_t *configs,
+     const char *native_lib_path) {
+-  if (backend_data_g) {
++  if (backend_data_) {
+     LOG(FATAL) << "Only one backend instance can be active at a time";
+   }
+   LOG(INFO) << "CONFIGS count = " << configs->count;
+@@ -88,30 +92,34 @@ mlperf_backend_ptr_t mlperf_backend_create(
+     LOG(INFO) << "configs->[" << configs->keys[i]
+               << "] = " << configs->values[i];
+   }
+-  backend_data_g = new QTIBackendHelper();
+-  QTIBackendHelper *backend_data = backend_data_g;
++  backend_data_ = new QTIBackendHelper();
++  QTIBackendHelper *backend_data = backend_data_;
+ 
+   process_config(configs, backend_data);
+ 
+   if (backend_data->bgLoad_) {
+-    CpuCtrl::startLoad();
++    CpuCtrl::startLoad(backend_data->loadOffTime_, backend_data->loadOnTime_);
+   }
+ 
+-  if (backend_data->is_tflite_) {
+-    // use highlatency cores for mobileBERT
++  if (backend_data->isTflite_) {
+     CpuCtrl::highLatency();
+-    backend_data->tflite_backend = tflite_backend_create(model_path, configs);
+-    backend_data->get_buffer_ = std_get_buffer;
+-    backend_data->release_buffer_ = std_release_buffer;
++    backend_data->tfliteBackend_ = tflite_backend_create(model_path, configs);
++    backend_data->getBuffer_ = std_get_buffer;
++    backend_data->releaseBuffer_ = std_release_buffer;
+     return backend_data;
+   }
+ 
+   // use lowLatency cores for all snpe models
+   CpuCtrl::lowLatency();
+ 
+-  // Use ION buffers for vision tasks
+-  backend_data->get_buffer_ = get_ion_buffer;
+-  backend_data->release_buffer_ = release_ion_buffer;
++  // Set buffers to be used for snpe
++  if (backend_data->useIonBuffers_) {
++    backend_data->getBuffer_ = get_ion_buffer;
++    backend_data->releaseBuffer_ = release_ion_buffer;
++  } else {
++    backend_data->getBuffer_ = std_get_buffer;
++    backend_data->releaseBuffer_ = std_release_buffer;
++  }
+ 
+   std::stringstream adsp_lib_path;
+   adsp_lib_path << native_lib_path << ";";
+@@ -151,18 +159,18 @@ void mlperf_backend_delete(mlperf_backend_ptr_t backend_ptr) {
+     CpuCtrl::stopLoad();
+   }
+   CpuCtrl::normalLatency();
+-  if (backend_data->is_tflite_) {
+-    tflite_backend_delete(backend_data->tflite_backend);
++  if (backend_data->isTflite_) {
++    tflite_backend_delete(backend_data->tfliteBackend_);
+   }
+   delete backend_data;
+-  backend_data_g = nullptr;
++  backend_data_ = nullptr;
+ }
+ 
+ // Run the inference for a sample.
+ mlperf_status_t mlperf_backend_issue_query(mlperf_backend_ptr_t backend_ptr) {
+   QTIBackendHelper *backend_data = (QTIBackendHelper *)backend_ptr;
+-  if (backend_data->is_tflite_) {
+-    return tflite_backend_issue_query(backend_data->tflite_backend);
++  if (backend_data->isTflite_) {
++    return tflite_backend_issue_query(backend_data->tfliteBackend_);
+   }
+   if (!backend_data->useSnpe_) {
+     if (!backend_data->psnpe_->execute(backend_data->inputMap_,
+@@ -181,8 +189,8 @@ mlperf_status_t mlperf_backend_issue_query(mlperf_backend_ptr_t backend_ptr) {
+ // Flush the staged queries immediately.
+ mlperf_status_t mlperf_backend_flush_queries(mlperf_backend_ptr_t backend_ptr) {
+   QTIBackendHelper *backend_data = (QTIBackendHelper *)backend_ptr;
+-  if (backend_data->is_tflite_) {
+-    return tflite_backend_flush_queries(backend_data->tflite_backend);
++  if (backend_data->isTflite_) {
++    return tflite_backend_flush_queries(backend_data->tfliteBackend_);
+   }
+   return MLPERF_SUCCESS;
+ }
+@@ -190,20 +198,20 @@ mlperf_status_t mlperf_backend_flush_queries(mlperf_backend_ptr_t backend_ptr) {
+ // Return the number of inputs of the model.
+ int32_t mlperf_backend_get_input_count(mlperf_backend_ptr_t backend_ptr) {
+   QTIBackendHelper *backend_data = (QTIBackendHelper *)backend_ptr;
+-  if (backend_data->is_tflite_) {
+-    return tflite_backend_get_input_count(backend_data->tflite_backend);
++  if (backend_data->isTflite_) {
++    return tflite_backend_get_input_count(backend_data->tfliteBackend_);
+   }
+-  return backend_data->input_format_.size();
++  return backend_data->inputFormat_.size();
+ }
+ 
+ // Return the type of the ith input.
+ mlperf_data_t mlperf_backend_get_input_type(mlperf_backend_ptr_t backend_ptr,
+                                             int32_t i) {
+   QTIBackendHelper *backend_data = (QTIBackendHelper *)backend_ptr;
+-  if (backend_data->is_tflite_) {
+-    return tflite_backend_get_input_type(backend_data->tflite_backend, i);
++  if (backend_data->isTflite_) {
++    return tflite_backend_get_input_type(backend_data->tfliteBackend_, i);
+   }
+-  return backend_data->input_format_[i];
++  return backend_data->inputFormat_[i];
+ }
+ 
+ // Set the data for ith input.
+@@ -211,86 +219,104 @@ mlperf_status_t mlperf_backend_set_input(mlperf_backend_ptr_t backend_ptr,
+                                          int32_t batchIndex, int32_t i,
+                                          void *data) {
+   QTIBackendHelper *backend_data = (QTIBackendHelper *)backend_ptr;
+-  if (backend_data->is_tflite_) {
+-    return tflite_backend_set_input(backend_data->tflite_backend, batchIndex, i,
++  if (backend_data->isTflite_) {
++    return tflite_backend_set_input(backend_data->tfliteBackend_, batchIndex, i,
+                                     data);
+   }
+-  // The inputs are in contiguous batches of backend_data->input_batch_ inputs
+-  if (batchIndex % backend_data->input_batch_ == 0)
+-    for (auto &name : backend_data->networkInputTensorNames_) {
+-      // If the value is a pad value for batched case then use the pointer to
+-      // its contiguous block
+-      void *batchedDataPtr = (backend_data->input_batch_ > 1)
+-                                 ? ChunkAllocator::GetBatchPtr(data)
+-                                 : data;
+-      if (batchedDataPtr != data) {
+-        LOG(INFO) << "TESTING: Using " << batchedDataPtr << " instead of "
+-                  << data;
+-      }
+-      backend_data->inputMap_[batchIndex / backend_data->input_batch_]
+-          .getUserBuffer(name)
+-          ->setBufferAddress(batchedDataPtr);
+-    }
++  // The inputs are in contiguous batches of backend_data->inputBatch_ inputs
++  // If the value is a pad value for batched case then use the pointer to
++  // its contiguous block
++  void *batchedDataPtr = (backend_data->inputBatch_ > 1)
++                             ? ChunkAllocator::GetBatchPtr(data)
++                             : data;
++  // if (batchedDataPtr != data) {
++  //   LOG(INFO) << "TESTING: Using " << batchedDataPtr << " instead of " <<
++  //   data;
++  // }
++  backend_data->inputMap_[batchIndex / backend_data->inputBatch_]
++      .getUserBuffer(backend_data->networkInputTensorNames_.at(i))
++      ->setBufferAddress(batchedDataPtr);
+   return MLPERF_SUCCESS;
+ }
+ 
+ // Return the number of outputs for the model.
+ int32_t mlperf_backend_get_output_count(mlperf_backend_ptr_t backend_ptr) {
+   QTIBackendHelper *backend_data = (QTIBackendHelper *)backend_ptr;
+-  if (backend_data->is_tflite_) {
+-    return tflite_backend_get_output_count(backend_data->tflite_backend);
++  if (backend_data->isTflite_) {
++    return tflite_backend_get_output_count(backend_data->tfliteBackend_);
+   }
+-  return backend_data->output_format_.size();
++  return backend_data->outputFormat_.size();
+ }
+ // Return the type of ith output.
+ mlperf_data_t mlperf_backend_get_output_type(mlperf_backend_ptr_t backend_ptr,
+                                              int32_t i) {
+   QTIBackendHelper *backend_data = (QTIBackendHelper *)backend_ptr;
+-  if (backend_data->is_tflite_) {
+-    return tflite_backend_get_output_type(backend_data->tflite_backend, i);
++  if (backend_data->isTflite_) {
++    return tflite_backend_get_output_type(backend_data->tfliteBackend_, i);
+   }
+-  return backend_data->output_format_[i];
++  return backend_data->outputFormat_[i];
+ }
+ 
+ // Get the data from ith output.
+ mlperf_status_t mlperf_backend_get_output(mlperf_backend_ptr_t backend_ptr,
+-                                          uint32_t batchIndex, int32_t i,
+-                                          void **data) {
++                                          uint32_t batchIndex,
++                                          int32_t outputIndex, void **data) {
+   QTIBackendHelper *backend_data = (QTIBackendHelper *)backend_ptr;
+-  if (backend_data->is_tflite_) {
+-    return tflite_backend_get_output(backend_data->tflite_backend, batchIndex,
+-                                     i, data);
++  if (backend_data->isTflite_) {
++    return tflite_backend_get_output(backend_data->tfliteBackend_, batchIndex,
++                                     outputIndex, data);
+   }
+-  if (backend_data->snpe_output_layers_ ==
++  if (backend_data->snpeOutputLayers_ ==
+       "Postprocessor/BatchMultiClassNonMaxSuppression") {
+-    /* Reorder snpe_output_layers for coco process_output */
+-    std::unordered_map<int, int> mdet;
+-    mdet[0] = 0;
+-    mdet[1] = 1;
+-    mdet[2] = 3;
+-    mdet[3] = 2;
+-    *data = backend_data->bufs_[batchIndex]
+-                .at(backend_data->networkOutputTensorNames_.at(mdet.at(i)))
+-                .data();
++    // Reorder snpeOutputLayers_ for coco process_output
++    std::unordered_map<int, std::string> mapIndexLayer;
++    mapIndexLayer[0] = "boxes";
++    mapIndexLayer[1] = "classes";
++    mapIndexLayer[2] = "scores";
++    mapIndexLayer[3] = "num_detections";
++    const char *outputLayerName;
++
++    for (int idx = 0; idx < backend_data->networkOutputTensorNames_.size();
++         idx++) {
++      if (strstr(backend_data->networkOutputTensorNames_.at(idx),
++                 mapIndexLayer[outputIndex].c_str())) {
++        // layer name found
++        outputLayerName = backend_data->networkOutputTensorNames_.at(idx);
++        break;
++      }
++    }
++
++    *data = backend_data->bufs_[batchIndex].at(outputLayerName).data();
++    return MLPERF_SUCCESS;
++  } else if (backend_data->snpeOutputLayers_ == "transpose") {
++    *data = backend_data->bufs_[int(batchIndex / backend_data->inputBatch_)]
++                .at(backend_data->networkOutputTensorNames_.at(0))
++                .data() +
++            (1 - outputIndex) * 384 * sizeof(float);
+     return MLPERF_SUCCESS;
+   }
++  size_t size = sizeof(float);
++  if (backend_data->outputBufferType_ ==
++      QTIBackendHelper::QTIBufferType::UINT_8) {
++    size = sizeof(uint8_t);
++  }
+ 
+-  *data = backend_data->bufs_[int(batchIndex / backend_data->input_batch_)]
+-              .at(backend_data->networkOutputTensorNames_.at(i))
+-              .data() +
+-          (batchIndex % backend_data->input_batch_) *
+-              int(backend_data->output_batch_bufsize_ /
+-                  backend_data->input_batch_) *
+-              sizeof(float);
++  *data =
++      backend_data->bufs_[int(batchIndex / backend_data->inputBatch_)]
++          .at(backend_data->networkOutputTensorNames_.at(outputIndex))
++          .data() +
++      (batchIndex % backend_data->inputBatch_) *
++          int(backend_data->outputBatchBufsize_ / backend_data->inputBatch_) *
++          size;
+   return MLPERF_SUCCESS;
+ }
+ 
+ void *mlperf_backend_get_buffer(size_t n) {
+-  return backend_data_g->get_buffer_(n);
++  return backend_data_->getBuffer_(n);
+ }
+ 
+ void mlperf_backend_release_buffer(void *p) {
+-  backend_data_g->release_buffer_(p);
++  backend_data_->releaseBuffer_(p);
+ }
+ 
+ #ifdef __cplusplus
+diff --git a/mobile_back_qti/cpp/backend_qti/qti_settings.h b/mobile_back_qti/cpp/backend_qti/qti_settings.h
+index 21086e4..faeb008 100644
+--- a/mobile_back_qti/cpp/backend_qti/qti_settings.h
++++ b/mobile_back_qti/cpp/backend_qti/qti_settings.h
+@@ -59,8 +59,8 @@ common_setting {
+   id: "cooldown"
+   name: "Cooldown"
+   value {
+-    value: "0"
+-    name: "false"
++    value: "1"
++    name: "true"
+   }
+   acceptable_value {
+     value: "1"
+@@ -74,7 +74,7 @@ common_setting {
+ 
+ benchmark_setting {
+   benchmark_id: "IC_tpu_uint8"
+-  accelerator: "snpe aip"
++  accelerator: "snpe_aip"
+   accelerator_desc: "AIP"
+   configuration: "SNPE"
+   src: "https://github.com/mlcommons/mobile_models/raw/main/v1_0/SNPE/mobilenet_edgetpu_224_1.0_hta.dlc"
+@@ -82,7 +82,7 @@ benchmark_setting {
+ 
+ benchmark_setting {
+   benchmark_id: "IC_tpu_uint8_offline"
+-  accelerator: "psnpe aip"
++  accelerator: "psnpe_aip"
+   accelerator_desc: "AIP"
+   configuration: "SNPE"
+   batch_size: 3072
+@@ -95,11 +95,11 @@ benchmark_setting {
+ 
+ benchmark_setting {
+   benchmark_id: "OD_uint8"
+-  accelerator: "snpe aip"
++  accelerator: "snpe_aip"
+   accelerator_desc: "AIP"
+   configuration: "SNPE"
+   custom_setting {
+-    id: "snpeOutputLayers"
++    id: "snpe_output_layers"
+     value: "Postprocessor/BatchMultiClassNonMaxSuppression"
+   }
+   src: "https://github.com/mlcommons/mobile_models/raw/main/v1_0/SNPE/ssd_mobiledet_qat_hta.dlc"
+@@ -115,7 +115,7 @@ benchmark_setting {
+ 
+ benchmark_setting {
+   benchmark_id: "IS_uint8"
+-  accelerator: "snpe aip"
++  accelerator: "snpe_aip"
+   accelerator_desc: "AIP"
+   configuration: "SNPE"
+   src: "https://github.com/mlcommons/mobile_models/raw/main/v1_0/SNPE/deeplabv3_hta.dlc"
+@@ -182,9 +182,167 @@ common_setting {
+   id: "cooldown"
+   name: "Cooldown"
+   value {
++    value: "1"
++    name: "true"
++  }
++  acceptable_value {
++    value: "1"
++    name: "true"
++  }
++  acceptable_value {
+     value: "0"
+     name: "false"
+   }
++}
++
++benchmark_setting {
++  benchmark_id: "IC_tpu_uint8"
++  accelerator: "snpe_dsp"
++  accelerator_desc: "HTP"
++  configuration: "SNPE"
++  custom_setting {
++    id: "bg_load"
++    value: "true"
++  }
++  src: "/sdcard/mlperf_models/mobilenet_edgetpu_224_1.0_htp.dlc"
++}
++
++benchmark_setting {
++  benchmark_id: "IC_tpu_uint8_offline"
++  accelerator: "psnpe_dsp"
++  accelerator_desc: "HTP"
++  configuration: "SNPE"
++  batch_size: 12288
++  custom_setting {
++    id: "scenario"
++    value: "Offline"
++  }
++  src: "/sdcard/mlperf_models/mobilenet_edgetpu_224_1.0_htp_batched.dlc"
++}
++
++benchmark_setting {
++  benchmark_id: "OD_uint8"
++  accelerator: "snpe_dsp"
++  accelerator_desc: "HTP"
++  configuration: "SNPE"
++  custom_setting {
++    id: "snpe_output_layers"
++    value: "Postprocessor/BatchMultiClassNonMaxSuppression"
++  }
++  custom_setting {
++    id: "bg_load"
++    value: "true"
++  }
++  src: "/sdcard/mlperf_models/ssd_mobiledet_qat_htp.dlc"
++}
++
++benchmark_setting {
++  benchmark_id: "LU_int8"
++  accelerator: "psnpe_dsp"
++  accelerator_desc: "HTP"
++  configuration: "SNPE"
++  custom_setting {
++    id: "snpe_output_layers"
++    value: "transpose"
++  }
++  custom_setting {
++    id: "bg_load"
++    value: "true"
++  }
++  custom_setting {
++    id: "input_buffer_type"
++    value: "float_32"
++  }
++  custom_setting {
++    id: "use_ion_buffer"
++    value: "false"
++  }
++  src: "/sdcard/mlperf_models/mobilebert_quantized_htp.dlc"
++}
++
++benchmark_setting {
++  benchmark_id: "IS_uint8"
++  accelerator: "psnpe_dsp"
++  accelerator_desc: "HTP"
++  configuration: "SNPE"
++  custom_setting {
++    id: "input_buffer_type"
++    value: "uint_8"
++  }
++  custom_setting {
++    id: "bg_load"
++    value: "true"
++  }
++  custom_setting {
++    id: "output_buffer_type"
++    value: "uint_8"
++  }
++  src: "/sdcard/mlperf_models/deeplabv3_htp.dlc"
++})SETTINGS";
++
++const std::string qti_settings_sdm778 = R"SETTINGS(
++common_setting {
++  id: "num_threads"
++  name: "Number of threads"
++  value {
++    value: "4"
++    name: "4 threads"
++  }
++  acceptable_value {
++    value: "1"
++    name: "Single thread"
++  }
++  acceptable_value {
++    value: "2"
++    name: "2 threads"
++  }
++  acceptable_value {
++    value: "4"
++    name: "4 threads"
++  }
++  acceptable_value {
++    value: "8"
++    name: "8 threads"
++  }
++  acceptable_value {
++    value: "16"
++    name: "16 threads"
++  }
++}
++
++common_setting {
++  id: "configuration"
++  name: "configuration"
++  value {
++    value: "QTI backend using SNPE, NNAPI and TFLite GPU Delegate"
++    name: "QTI"
++  }
++}
++
++common_setting {
++  id: "share_results"
++  name: "Share results"
++  value {
++    value: "0"
++    name: "false"
++  }
++  acceptable_value {
++    value: "1"
++    name: "true"
++  }
++  acceptable_value {
++    value: "0"
++    name: "false"
++  }
++}
++
++common_setting {
++  id: "cooldown"
++  name: "Cooldown"
++  value {
++    value: "1"
++    name: "true"
++  }
+   acceptable_value {
+     value: "1"
+     name: "true"
+@@ -197,63 +355,82 @@ common_setting {
+ 
+ benchmark_setting {
+   benchmark_id: "IC_tpu_uint8"
+-  accelerator: "psnpe dsp"
++  accelerator: "snpe_dsp"
+   accelerator_desc: "HTP"
+   configuration: "SNPE"
+-  src: "https://github.com/mlcommons/mobile_models/raw/main/v1_0/SNPE/mobilenet_edgetpu_224_1.0_htp.dlc"
++  custom_setting {
++    id: "bg_load"
++    value: "true"
++  }
++  src: "/sdcard/mlperf_models/mobilenet_edgetpu_224_1.0_htp.dlc"
+ }
+ 
+ benchmark_setting {
+   benchmark_id: "IC_tpu_uint8_offline"
+-  accelerator: "psnpe dsp"
++  accelerator: "psnpe_dsp"
+   accelerator_desc: "HTP"
+   configuration: "SNPE"
+-  batch_size: 3072
++  batch_size: 12288
+   custom_setting {
+     id: "scenario"
+     value: "Offline"
+   }
+-  src: "https://github.com/mlcommons/mobile_models/raw/main/v1_0/SNPE/mobilenet_edgetpu_224_1.0_htp_batched.dlc"
++  src: "/sdcard/mlperf_models/mobilenet_edgetpu_224_1.0_htp_batched.dlc"
+ }
+ 
+ benchmark_setting {
+   benchmark_id: "OD_uint8"
+-  accelerator: "psnpe dsp"
++  accelerator: "snpe_dsp"
+   accelerator_desc: "HTP"
+   configuration: "SNPE"
+   custom_setting {
+-    id: "snpeOutputLayers"
++    id: "snpe_output_layers"
+     value: "Postprocessor/BatchMultiClassNonMaxSuppression"
+   }
+   custom_setting {
+-    id: "bgLoad"
++    id: "bg_load"
+     value: "true"
+   }
+-  src: "https://github.com/mlcommons/mobile_models/raw/main/v1_0/SNPE/ssd_mobiledet_qat_htp.dlc"
++  src: "/sdcard/mlperf_models/ssd_mobiledet_qat_htp.dlc"
+ }
+ 
+ benchmark_setting {
+-  benchmark_id: "LU_gpu_float32"
+-  accelerator: "gpu_f16"
+-  accelerator_desc: "GPU (FP16)"
+-  configuration: "TFLite"
++  benchmark_id: "LU_int8"
++  accelerator: "psnpe_dsp"
++  accelerator_desc: "HTP"
++  configuration: "SNPE"
+   custom_setting {
+-    id: "bgLoad"
++    id: "snpe_output_layers"
++    value: "transpose"
++  }
++  custom_setting {
++    id: "input_buffer_type"
++    value: "float_32"
++  }
++  custom_setting {
++    id: "bg_load"
+     value: "true"
+   }
+-  src: "https://github.com/mlcommons/mobile_models/raw/main/v0_7/tflite/mobilebert_float_384_gpu.tflite"
++  src: "/sdcard/mlperf_models/mobilebert_quantized_htp.dlc"
+ }
+ 
+ benchmark_setting {
+   benchmark_id: "IS_uint8"
+-  accelerator: "psnpe dsp"
++  accelerator: "psnpe_dsp"
+   accelerator_desc: "HTP"
+   configuration: "SNPE"
+   custom_setting {
+-    id: "bgLoad"
++    id: "input_buffer_type"
++    value: "uint_8"
++  }
++  custom_setting {
++    id: "output_buffer_type"
++    value: "uint_8"
++  }
++  custom_setting {
++    id: "bg_load"
+     value: "true"
+   }
+-  src: "https://github.com/mlcommons/mobile_models/raw/main/v1_0/SNPE/deeplabv3_htp.dlc"
++  src: "/sdcard/mlperf_models/deeplabv3_htp.dlc"
+ })SETTINGS";
+-
+ #endif
+diff --git a/mobile_back_qti/cpp/backend_qti/rpcmem.cc b/mobile_back_qti/cpp/backend_qti/rpcmem.cc
+index b8e6695..8cda40b 100644
+--- a/mobile_back_qti/cpp/backend_qti/rpcmem.cc
++++ b/mobile_back_qti/cpp/backend_qti/rpcmem.cc
+@@ -14,28 +14,32 @@ limitations under the License.
+ ==============================================================================*/
+ 
+ #include "rpcmem.h"
++#include "cpuctrl.h"
+ 
+ #include "tensorflow/core/platform/logging.h"
+ 
+ RpcMem::RpcMem() {
+-  libHandle_ = dlopen("libadsprpc.so", RTLD_NOW);
++  if (CpuCtrl::getSocId() != SDM865) {
++    libHandle_ = dlopen("libcdsprpc.so", RTLD_NOW);
++  } else {
++    libHandle_ = nullptr;
++  }
+ 
+   if (libHandle_ == nullptr) {
+     LOG(ERROR) << "Can't open rpc lib";
+     isSuccess_ = false;
+   } else {
+-    rpcmem_alloc =
++    rpcmemAlloc_ =
+         reinterpret_cast<RpcMemAllocPtr>(dlsym(libHandle_, "rpcmem_alloc"));
+-    rpcmem_free =
++    rpcmemFree_ =
+         reinterpret_cast<RpcMemFreePtr>(dlsym(libHandle_, "rpcmem_free"));
+ 
+-    if (rpcmem_alloc && rpcmem_free) {
++    if (rpcmemAlloc_ && rpcmemFree_) {
+       isSuccess_ = true;
+     } else {
+       isSuccess_ = false;
++      LOG(ERROR) << "Unable to dlsym rpcmem functions";
+     }
+-
+-    LOG(ERROR) << "Able to open rpc lib. " << isSuccess_;
+   }
+ }
+ 
+@@ -46,7 +50,7 @@ RpcMem::~RpcMem() {
+ 
+ void *RpcMem::Alloc(int id, uint32_t flags, int size) {
+   if (isSuccess_) {
+-    return rpcmem_alloc(id, flags, size);
++    return rpcmemAlloc_(id, flags, size);
+   } else {
+     return std::malloc(size);
+   }
+@@ -56,7 +60,7 @@ void *RpcMem::Alloc(int size) { return Alloc(25, 1, size); }
+ 
+ void RpcMem::Free(void *data) {
+   if (isSuccess_) {
+-    return rpcmem_free(data);
++    return rpcmemFree_(data);
+   } else {
+     return std::free(data);
+   }
+diff --git a/mobile_back_qti/cpp/backend_qti/rpcmem.h b/mobile_back_qti/cpp/backend_qti/rpcmem.h
+index 34e4192..3acbc4a 100644
+--- a/mobile_back_qti/cpp/backend_qti/rpcmem.h
++++ b/mobile_back_qti/cpp/backend_qti/rpcmem.h
+@@ -36,8 +36,8 @@ class RpcMem {
+  private:
+   void *libHandle_;
+   bool isSuccess_;
+-  RpcMemAllocPtr rpcmem_alloc{nullptr};
+-  RpcMemFreePtr rpcmem_free{nullptr};
++  RpcMemAllocPtr rpcmemAlloc_{nullptr};
++  RpcMemFreePtr rpcmemFree_{nullptr};
+ };
+ 
+ #endif  // RPCMEM_H
+diff --git a/mobile_back_qti/cpp/backend_qti/tflite_c.cc b/mobile_back_qti/cpp/backend_qti/tflite_c.cc
+index 39e5b9e..5961aac 100644
+--- a/mobile_back_qti/cpp/backend_qti/tflite_c.cc
++++ b/mobile_back_qti/cpp/backend_qti/tflite_c.cc
+@@ -81,8 +81,7 @@ mlperf_backend_ptr_t tflite_backend_create(
+   std::string delegateStr = configs->accelerator;
+ #if __ANDROID__
+   if (delegateStr == "gpu_f16") {
+-    TfLiteGpuDelegateOptionsV2 options =
+-        TfLiteGpuDelegateOptionsV2Default();
++    TfLiteGpuDelegateOptionsV2 options = TfLiteGpuDelegateOptionsV2Default();
+     options.inference_preference =
+         TFLITE_GPU_INFERENCE_PREFERENCE_SUSTAINED_SPEED;
+     options.inference_priority1 = TFLITE_GPU_INFERENCE_PRIORITY_MIN_LATENCY;
+@@ -93,8 +92,8 @@ mlperf_backend_ptr_t tflite_backend_create(
+     options.allow_fp16 = false;
+     options.disallow_nnapi_cpu = true;
+     std::string accelerator_name =
+-        (delegateStr.find("-") != std::string::npos)
+-            ? delegateStr.substr(delegateStr.find('-') + 1)
++        (delegateStr.find("_") != std::string::npos)
++            ? delegateStr.substr(delegateStr.find('_') + 1)
+             : std::string();
+     options.execution_preference = tflite::StatefulNnApiDelegate::Options::
+         ExecutionPreference::kFastSingleAnswer;
+@@ -179,7 +178,7 @@ mlperf_data_t tflite_backend_get_input_type(mlperf_backend_ptr_t backend_ptr,
+ }
+ // Set the data for ith input.
+ mlperf_status_t tflite_backend_set_input(mlperf_backend_ptr_t backend_ptr,
+-                                         int32_t batchIndex, int32_t i,
++                                         int32_t batch_index, int32_t i,
+                                          void* data) {
+   TFLiteBackendData* backend_data = (TFLiteBackendData*)backend_ptr;
+   TfLiteTensor* tensor =
+@@ -207,7 +206,7 @@ mlperf_data_t tflite_backend_get_output_type(mlperf_backend_ptr_t backend_ptr,
+ 
+ // Get the data from ith output.
+ mlperf_status_t tflite_backend_get_output(mlperf_backend_ptr_t backend_ptr,
+-                                          uint32_t batchIndex, int32_t i,
++                                          uint32_t batch_index, int32_t i,
+                                           void** data) {
+   TFLiteBackendData* backend_data = (TFLiteBackendData*)backend_ptr;
+   const TfLiteTensor* output_tensor =
+diff --git a/mobile_back_qti/datasets/Makefile b/mobile_back_qti/datasets/Makefile
+index 829b9ed..5c24777 100644
+--- a/mobile_back_qti/datasets/Makefile
++++ b/mobile_back_qti/datasets/Makefile
+@@ -22,7 +22,8 @@ dependencies:
+ 
+ ${BUILDDIR}/datasets.stamp: dependencies ${BUILDDIR}/ade20k/ade20k_out/.stamp \
+ 		${BUILDDIR}/coco/coco-out/.stamp \
+-		${BUILDDIR}/imagenet/imagenet-out/.stamp
++		${BUILDDIR}/imagenet/imagenet-out/.stamp \
++		${BUILDDIR}/SQUAD/SQUAD_out/.stamp
+ 	@touch $@
+ 
+ # ADE20K
+@@ -37,13 +38,19 @@ ${BUILDDIR}/coco/coco-out/.stamp:
+ ${BUILDDIR}/imagenet/imagenet-out/.stamp:
+ 	@(cd imagenet && make)
+ 
++# SQUAD
++${BUILDDIR}/SQUAD/SQUAD_out/.stamp:
++	@(cd squad && make)
++
+ clean:
+ 	@(cd ade20k && make clean)
+ 	@(cd coco && make clean)
+ 	@(cd imagenet && make clean)
++	@(cd squad && make clean)
+ 	@rm ${BUILDDIR}/datasets.stamp
+ 
+ clean_downloads:
+ 	@(cd ade20k && make clean_downloads)
+ 	@(cd coco && make clean_downloads)
+ 	@(cd imagenet && make clean_downloads)
++	@(cd squad && make clean_downloads)
+diff --git a/mobile_back_qti/datasets/squad/Makefile b/mobile_back_qti/datasets/squad/Makefile
+new file mode 100644
+index 0000000..f355ac5
+--- /dev/null
++++ b/mobile_back_qti/datasets/squad/Makefile
+@@ -0,0 +1,60 @@
++# Copyright (c) 2020-2021 Qualcomm Innovation Center, Inc. All rights reserved.
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++##########################################################################
++
++include ../../make/builddir.mk
++
++SQUAD_OUT=${BUILDDIR}/SQUAD/SQUAD_out
++DOWNLOADS=${BUILDDIR}/SQUAD/downloads
++
++all: ${SQUAD_OUT}/.stamp
++
++include ../../make/docker.mk
++
++${DOWNLOADS}/mobilebert.tar.gz:
++	@mkdir -p ${DOWNLOADS}
++	@echo "Fetching SQUAD vocab file"
++	@curl -o $@ -L https://storage.googleapis.com/cloud-tpu-checkpoints/mobilebert/uncased_L-24_H-128_B-512_A-4_F-4_OPT.tar.gz
++	@cd ${DOWNLOADS} && tar -xvf $@
++	@chmod 777 -R ${DOWNLOADS}/mobilebert
++	@cd ${DOWNLOADS}/mobilebert/
++	@echo "Fetching SQUAD dataset dev-v1.1.json"
++	@curl -o ${DOWNLOADS}/mobilebert/dev-v1.1.json -L https://rajpurkar.github.io/SQuAD-explorer/dataset/dev-v1.1.json
++
++
++${SQUAD_OUT}/quantdata.stamp: \
++		${DOWNLOADS}/mobilebert.tar.gz \
++		${BUILDDIR}/mlperf_mobile_docker_1_0.stamp
++	@echo "Generating squad quantization data for SNPE"
++	@rm -rf ${SQUAD_OUT}/sqaud_raw
++	@mkdir -p ${SQUAD_OUT}/squad_raw
++	@touch ${SQUAD_OUT}/squad_raw/input_list.txt
++	@chmod 777 ${SQUAD_OUT}/squad_raw/input_list.txt
++	@docker run \
++		-v $(CURDIR)/squad_tools/:/squad_tools \
++		-v ${SQUAD_OUT}:/squad_out \
++		-v ${DOWNLOADS}/mobilebert/:/mobilebert \
++	  	-u ${USERID}:${GROUPID} \
++		mlcommons/mlperf_mobile:1.0 \
++		/bin/bash -c "python3 /squad_tools/convert.py --test_file /mobilebert/dev-v1.1.json --vocab_file /mobilebert/vocab.txt --output_dir /squad_out/squad_raw --input_list_dir /squad_out/squad_raw --num_samples 400"
++	@touch $@
++
++${SQUAD_OUT}/.stamp: ${SQUAD_OUT}/quantdata.stamp
++	touch $@
++
++clean:
++	@rm -rf ${SQUAD_OUT}
++
++clean_downloads:
++	@rm -rf ${DOWNLOADS}
+diff --git a/mobile_back_qti/datasets/squad/squad_tools/_nlp_common.py b/mobile_back_qti/datasets/squad/squad_tools/_nlp_common.py
+new file mode 100644
+index 0000000..8970f2f
+--- /dev/null
++++ b/mobile_back_qti/datasets/squad/squad_tools/_nlp_common.py
+@@ -0,0 +1,322 @@
++"""
++Copyright (c) 2019 Intel Corporation
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++      http://www.apache.org/licenses/LICENSE-2.0
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++"""
++
++import unicodedata
++try:
++    import sentencepiece as spm
++except ImportError:
++    spm = None
++#from ..config import ConfigError
++#from ..utils import contains_all
++
++
++SPIECE_UNDERLINE = '\N{LOWER ONE EIGHTH BLOCK}'
++SEG_ID_A = 0
++SEG_ID_B = 1
++SEG_ID_CLS = 2
++SEG_ID_SEP = 3
++SEG_ID_PAD = 4
++special_symbols = {
++    "<unk>": 0,
++    "<s>": 1,
++    "</s>": 2,
++    "<cls>": 3,
++    "<sep>": 4,
++    "<pad>": 5,
++    "<mask>": 6,
++    "<eod>": 7,
++    "<eop>": 8,
++}
++
++UNK_ID = special_symbols["<unk>"]
++CLS_ID = special_symbols["<cls>"]
++SEP_ID = special_symbols["<sep>"]
++MASK_ID = special_symbols["<mask>"]
++EOD_ID = special_symbols["<eod>"]
++
++
++WORD_PIECE_PARAMETERS = ['vocab_file']
++SENTENCE_PIECE_PARAMETERS = ['sentence_piece_model_file']
++
++
++def get_tokenizer(lower_case, vocab_file=None, sentence_piece_model_file=None):
++    tokenizer = None
++
++    if vocab_file:
++        tokenizer = WordPieceTokenizer(vocab_file, lower_case)
++    elif sentence_piece_model_file:
++        tokenizer = SentencePieceTokenizer(sentence_piece_model_file, lower_case)
++
++    if tokenizer is None:
++        raise ValueError('tokenization parameters is not found, please provide: \n'
++            'for WordPiece tokenization - {}\nfor SentencePiece tokenization - {}\n'.format(
++                ', '.join(WORD_PIECE_PARAMETERS), ', '.join(SENTENCE_PIECE_PARAMETERS))
++        )
++
++    return tokenizer
++
++
++class QuestionAnsweringAnnotation():
++    def __init__(self, identifier, unique_id, input_ids, input_mask, segment_ids, tokens, orig_answer_text=None):
++        self.identifier = identifier
++        self.orig_answer_text = orig_answer_text if orig_answer_text is not None else ''
++        self.unique_id = unique_id
++        self.input_ids = input_ids
++        self.input_mask = input_mask
++        self.segment_ids = segment_ids
++        self.tokens = tokens
++
++
++class WordPieceTokenizer:
++    def __init__(self, vocab_file, lower_case=True, tokenize_chinese_chars=True):
++        self.vocab = self.load_vocab(vocab_file)
++        self.lower_case = lower_case
++        self.tokenize_chinese_chars = tokenize_chinese_chars
++
++    @staticmethod
++    def _run_strip_accents(text):
++        text = unicodedata.normalize("NFD", text)
++        output = []
++        for char in text:
++            cat = unicodedata.category(char)
++            if cat == "Mn":
++                continue
++            output.append(char)
++        return "".join(output)
++
++    @staticmethod
++    def _run_split_on_punc(text):
++        def _is_punctuation(char):
++            punct = set('!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~')
++            if char in punct:
++                return True
++            cat = unicodedata.category(char)
++            if cat.startswith("P"):
++                return True
++            return False
++
++        chars = list(text)
++        i = 0
++        start_new_word = True
++        output = []
++        while i < len(chars):
++            char = chars[i]
++            if _is_punctuation(char):
++                output.append([char])
++                start_new_word = True
++            else:
++                if start_new_word:
++                    output.append([])
++                start_new_word = False
++                output[-1].append(char)
++            i += 1
++
++        return ["".join(x) for x in output]
++
++    def basic_tokenizer(self, text):
++        if isinstance(text, bytes):
++            text = text.decode("utf-8", "ignore")
++
++        if self.tokenize_chinese_chars:
++            text = self._tokenize_chinese_chars(text)
++
++        text = text.strip()
++        tokens = text.split() if text else []
++        split_tokens = []
++        for token in tokens:
++            if self.lower_case:
++                token = token.lower()
++                token = self._run_strip_accents(token)
++            split_tokens.extend(self._run_split_on_punc(token))
++
++        output_tokens = " ".join(split_tokens)
++        output_tokens = output_tokens.strip()
++        output_tokens = output_tokens.split() if output_tokens else []
++        return output_tokens
++
++    def _tokenize_chinese_chars(self, text):
++        """Adds whitespace around any CJK character."""
++        output = []
++        for char in text:
++            cp = ord(char)
++            if self._is_chinese_char(cp):
++                output.append(" ")
++                output.append(char)
++                output.append(" ")
++            else:
++                output.append(char)
++        return "".join(output)
++
++    @staticmethod
++    def _is_chinese_char(cp):
++        """Checks whether CP is the codepoint of a CJK character."""
++        # This defines a "chinese character" as anything in the CJK Unicode block:
++        #   https://en.wikipedia.org/wiki/CJK_Unified_Ideographs_(Unicode_block)
++        #
++        # Note that the CJK Unicode block is NOT all Japanese and Korean characters,
++        # despite its name. The modern Korean Hangul alphabet is a different block,
++        # as is Japanese Hiragana and Katakana. Those alphabets are used to write
++        # space-separated words, so they are not treated specially and handled
++        # like the all of the other languages.
++
++        #pylint:disable=chained-comparison
++        #pylint:disable=too-many-boolean-expressions
++        if ((cp >= 0x4E00 and cp <= 0x9FFF) or  #
++                (cp >= 0x3400 and cp <= 0x4DBF) or  #
++                (cp >= 0x20000 and cp <= 0x2A6DF) or  #
++                (cp >= 0x2A700 and cp <= 0x2B73F) or  #
++                (cp >= 0x2B740 and cp <= 0x2B81F) or  #
++                (cp >= 0x2B820 and cp <= 0x2CEAF) or
++                (cp >= 0xF900 and cp <= 0xFAFF) or  #
++                (cp >= 0x2F800 and cp <= 0x2FA1F)):  #
++            return True
++
++        return False
++
++    def wordpiece_tokenizer(self, text):
++        if isinstance(text, bytes):
++            text = text.decode("utf-8", "ignore")
++
++        output_tokens = []
++        text = text.strip()
++        tokens = text.split() if text else []
++        for token in tokens:
++            chars = list(token)
++            if len(chars) > 200:
++                output_tokens.append("[UNK]")
++                continue
++
++            is_bad = False
++            start = 0
++            sub_tokens = []
++            while start < len(chars):
++                end = len(chars)
++                cur_substr = None
++                while start < end:
++                    substr = "".join(chars[start:end])
++                    if start > 0:
++                        substr = "##" + substr
++                    if substr in self.vocab:
++                        cur_substr = substr
++                        break
++                    end -= 1
++                if cur_substr is None:
++                    is_bad = True
++                    break
++                sub_tokens.append(cur_substr)
++                start = end
++
++            if is_bad:
++                output_tokens.append("[UNK]")
++            else:
++                output_tokens.extend(sub_tokens)
++        return output_tokens
++
++    def tokenize(self, text):
++        tokens = []
++        for token in self.basic_tokenizer(text):
++            for sub_token in self.wordpiece_tokenizer(token):
++                tokens.append(sub_token)
++
++        return tokens
++
++    def convert_tokens_to_ids(self, items):
++        output = []
++        for item in items:
++            output.append(self.vocab[item])
++        return output
++
++    @staticmethod
++    def load_vocab(file):
++        vocab = {}
++        index = 0
++        with open(str(file), 'rb') as reader:
++            while True:
++                token = reader.readline()
++                if isinstance(token, bytes):
++                    token = token.decode("utf-8", "ignore")
++                if not token:
++                    break
++                token = token.strip()
++                vocab[token] = index
++                index += 1
++        return vocab
++
++
++def truncate_seq_pair(tokens_a, tokens_b, max_length):
++    """Truncates a sequence pair in place to the maximum length."""
++
++    # This is a simple heuristic which will always truncate the longer sequence
++    # one token at a time. This makes more sense than truncating an equal percent
++    # of tokens from each, since if one sequence is very short then each token
++    # that's truncated likely contains more information than a longer sequence.
++    while True:
++        total_length = len(tokens_a) + len(tokens_b)
++        if total_length <= max_length:
++            break
++        if len(tokens_a) > len(tokens_b):
++            tokens_a.pop()
++        else:
++            tokens_b.pop()
++
++
++class SentencePieceTokenizer:
++    def __init__(self, tokenizer_model, lower_case=True, remove_space=True):
++        if spm is None:
++            raise ImportError('Sentence piece tokenizer required sentencepiece, please install it before usage')
++        self.encoder = spm.SentencePieceProcessor()
++        self.encoder.Load(str(tokenizer_model))
++        self.lower_case = lower_case
++        self.remove_space = remove_space
++
++    def preprocess_text(self, inputs):
++        if self.remove_space:
++            outputs = ' '.join(inputs.strip().split())
++        else:
++            outputs = inputs
++
++        outputs = outputs.replace("``", '"').replace("''", '"')
++        if self.lower_case:
++            outputs = outputs.lower()
++
++        return outputs
++
++    def encode_ids(self, text, sample=False):
++        pieces = self.encode_pieces(text, sample)
++        ids = [self.encoder.PieceToId(piece) for piece in pieces]
++        return ids
++
++    def encode_pieces(self, text, sample=False):
++        if not sample:
++            pieces = self.encoder.EncodeAsPieces(text)
++        else:
++            pieces = self.encoder.SampleEncodeAsPieces(text, 64, 0.1)
++        new_pieces = []
++        for piece in pieces:
++            if len(piece) > 1 and piece[-1] == ',' and piece[-2].isdigit():
++                cur_pieces = self.encoder.EncodeAsPieces(
++                    piece[:-1].replace(SPIECE_UNDERLINE, ''))
++                if piece[0] != SPIECE_UNDERLINE and cur_pieces[0][0] == SPIECE_UNDERLINE:
++                    if len(cur_pieces[0]) == 1:
++                        cur_pieces = cur_pieces[1:]
++                    else:
++                        cur_pieces[0] = cur_pieces[0][1:]
++                cur_pieces.append(piece[-1])
++                new_pieces.extend(cur_pieces)
++            else:
++                new_pieces.append(piece)
++        return new_pieces
++
++    def tokenize(self, text):
++        text = self.preprocess_text(text)
++        return self.encode_ids(text)
+diff --git a/mobile_back_qti/datasets/squad/squad_tools/convert.py b/mobile_back_qti/datasets/squad/squad_tools/convert.py
+new file mode 100644
+index 0000000..f52ab9c
+--- /dev/null
++++ b/mobile_back_qti/datasets/squad/squad_tools/convert.py
+@@ -0,0 +1,75 @@
++#!/bin/bash
++# Copyright (c) 2020-2021 Qualcomm Innovation Center, Inc. All rights reserved.
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++##########################################################################
++
++import sys
++import errno
++import json
++import os
++import numpy as np
++from argparse import ArgumentParser
++sys.path.insert(1, 'py-bindings')
++from squad import SQUADConverter
++
++def get_arguments():
++    parser = ArgumentParser()
++    parser.add_argument("--test_file", type=str, help="Path to squad test json file", required=True)
++    parser.add_argument("--vocab_file", type=str, help="Path to vocab.txt file", required=True)
++    parser.add_argument("--max_seq_length", type=int, help="Max sequence length", default=384)
++    parser.add_argument("--num_samples", type=int, help="Number of samples to be converted", default=300)
++    parser.add_argument("--max_query_length", type=int, help="Max query length", default=64)
++    parser.add_argument("--doc_stride", type=int, help="Document stride", default=128)
++    parser.add_argument("--lower_case", type=bool, help="Lower case", default=1)
++    parser.add_argument("--output_dir", type=str, help="Output directory for saved raw files", default="samples_cache")
++    parser.add_argument("--input_list_dir", type=str, help="Output directory for input_list", default="samples_cache")
++    
++    return parser.parse_args()
++
++
++def main():
++
++    args = get_arguments()
++    if not os.path.isfile(args.test_file):
++        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), args.test_file)
++
++    if not os.path.isfile(args.vocab_file):
++        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), args.vocab_file)
++    
++    os.makedirs(args.output_dir, exist_ok=True)
++    sqd = SQUADConverter(args.test_file, args.vocab_file, args.max_seq_length, args.max_query_length, args.doc_stride, args.lower_case)
++    
++    # Convert examples and generate input_list
++    input_file_name= "input_list.txt"
++    file=open(os.path.join(args.input_list_dir,input_file_name), "w")
++    samples = sqd.convert()
++    for i in range(args.num_samples):
++        single_sample= samples[i]
++        input_mask = single_sample["input_mask"]
++        input_ids = single_sample["input_ids"]
++        segment_ids = single_sample["segment_ids"]
++        np_mask = np.asarray(input_mask).astype(np.float32)
++        file_name_1 = "input_mask_{}.raw".format(i)
++        np_mask.astype(np.float32).tofile(os.path.join(args.output_dir,file_name_1))
++        np_ids = np.asarray(input_ids).astype(np.float32)
++        file_name_2 = "input_ids_{}.raw".format(i)
++        np_ids.astype(np.float32).tofile(os.path.join(args.output_dir,file_name_2))
++        np_segment = np.asarray(segment_ids).astype(np.float32)
++        file_name_3 = "segment_ids_{}.raw".format(i)
++        np_segment.astype(np.float32).tofile(os.path.join(args.output_dir,file_name_3))
++        file.write("{} {} {}\n".format(file_name_2,file_name_1,file_name_3))
++    file.close()
++
++if __name__=="__main__":
++    main()
+diff --git a/mobile_back_qti/datasets/squad/squad_tools/squad.py b/mobile_back_qti/datasets/squad/squad_tools/squad.py
+new file mode 100644
+index 0000000..de79c2f
+--- /dev/null
++++ b/mobile_back_qti/datasets/squad/squad_tools/squad.py
+@@ -0,0 +1,162 @@
++"""
++Copyright (c) 2019 Intel Corporation
++
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++
++      http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++"""
++
++from collections import namedtuple
++import sys
++sys.path.insert(1, 'py-bindings')
++import numpy as np
++import json
++
++from _nlp_common import get_tokenizer, CLS_ID, SEP_ID
++
++class SQUADConverter():
++    # __provider__ = "squad"
++    # annotation_types = (QuestionAnsweringAnnotation, )
++
++    def __init__(self, testing_file, vocab_file, max_seq_length, max_query_length, doc_stride, lower_case ):
++        self.testing_file = testing_file
++        self.max_seq_length = max_seq_length
++        self.max_query_length = max_query_length
++        self.doc_stride = doc_stride
++        self.lower_case = lower_case
++        self.tokenizer = get_tokenizer(self.lower_case, vocab_file) #TODO: Check option for sentence_piece
++        self.support_vocab = True #TODO: Check for vocab support
++
++    @staticmethod
++    def _load_examples(file):
++        def _is_whitespace(c):
++            if c == " " or c == "\t" or c == "\r" or c == "\n" or ord(c) == 0x202F:
++                return True
++            return False
++
++        def read_json(test_file_path):
++            with open(test_file_path, 'r') as content:
++                return json.load(content)
++
++        examples = []
++        answers = []
++        data = read_json(file)['data']
++
++        for entry in data:
++            for paragraph in entry['paragraphs']:
++                paragraph_text = paragraph["context"]
++                doc_tokens = []
++                char_to_word_offset = []
++                prev_is_whitespace = True
++                for c in paragraph_text:
++                    if _is_whitespace(c):
++                        prev_is_whitespace = True
++                    else:
++                        if prev_is_whitespace:
++                            doc_tokens.append(c)
++                        else:
++                            doc_tokens[-1] += c
++                        prev_is_whitespace = False
++                    char_to_word_offset.append(len(doc_tokens) - 1)
++
++                for qa in paragraph["qas"]:
++                    qas_id = qa["id"]
++                    question_text = qa["question"]
++                    orig_answer_text = qa["answers"]
++                    is_impossible = False
++
++                    example = {
++                        'id': qas_id,
++                        'question_text': question_text,
++                        'tokens': doc_tokens,
++                        'is_impossible': is_impossible
++                    }
++                    examples.append(example)
++                    answers.append(orig_answer_text)
++        return examples, answers
++
++    def convert(self): #check_content=False, progress_callback=None, progress_interval=100, **kwargs):
++        examples, answers = self._load_examples(self.testing_file)
++        
++        all_samples = []
++
++        unique_id = 1000000000
++        DocSpan = namedtuple("DocSpan", ["start", "length"])
++
++        for (example_index, example) in enumerate(examples):
++            query_tokens = self.tokenizer.tokenize(example['question_text'])
++            if len(query_tokens) > self.max_query_length:
++                query_tokens = query_tokens[:self.max_query_length]
++            all_doc_tokens = []
++            for (i, token) in enumerate(example['tokens']):
++                sub_tokens = self.tokenizer.tokenize(token)
++                for sub_token in sub_tokens:
++                    all_doc_tokens.append(sub_token)
++            max_tokens_for_doc = self.max_seq_length - len(query_tokens) - 3
++            doc_spans = []
++            start_offset = 0
++            while start_offset < len(all_doc_tokens):
++                length = len(all_doc_tokens) - start_offset
++                if length > max_tokens_for_doc:
++                    length = max_tokens_for_doc
++                doc_spans.append(DocSpan(start_offset, length))
++                if start_offset + length == len(all_doc_tokens):
++                    break
++                start_offset += min(length, self.doc_stride)
++            for idx, doc_span in enumerate(doc_spans):
++                sample_dict = {}
++                tokens = []
++                segment_ids = []
++                tokens.append("[CLS]" if self.support_vocab else CLS_ID)
++                segment_ids.append(0)
++                for token in query_tokens:
++                    tokens.append(token)
++                    segment_ids.append(0)
++                tokens.append("[SEP]" if self.support_vocab else SEP_ID)
++                segment_ids.append(0)
++                for i in range(doc_span.length):
++                    split_token_index = doc_span.start + i
++                    tokens.append(all_doc_tokens[split_token_index])
++                    segment_ids.append(1)
++                tokens.append("[SEP]" if self.support_vocab else SEP_ID)
++                segment_ids.append(1)
++                input_ids = self.tokenizer.convert_tokens_to_ids(tokens) if self.support_vocab else tokens
++                input_mask = [1] * len(input_ids)
++                while len(input_ids) < self.max_seq_length:
++                    input_ids.append(0)
++                    input_mask.append(0)
++                    segment_ids.append(0)
++
++                sample_dict['input_ids'] = input_ids
++                sample_dict['input_mask'] = input_mask
++                sample_dict['segment_ids'] = segment_ids
++                sample_dict['tokens'] = tokens
++                all_samples.append(sample_dict)
++        return all_samples
++
++    @staticmethod
++    def _is_max_context(doc_spans, cur_span_index, position):
++        best_score = None
++        best_span_index = None
++        for (span_index, doc_span) in enumerate(doc_spans):
++            end = doc_span.start + doc_span.length - 1
++            if position < doc_span.start:
++                continue
++            if position > end:
++                continue
++            num_left_context = position - doc_span.start
++            num_right_context = end - position
++            score = min(num_left_context, num_right_context) + 0.01 * doc_span.length
++            if best_score is None or score > best_score:
++                best_score = score
++                best_span_index = span_index
++
++        return cur_span_index == best_span_index
+diff --git a/mobile_back_qti/utils/get_results.sh b/mobile_back_qti/utils/get_results.sh
+index bf4f299..cb05fbd 100755
+--- a/mobile_back_qti/utils/get_results.sh
++++ b/mobile_back_qti/utils/get_results.sh
+@@ -25,7 +25,7 @@ ASSETS=$1
+ 
+ mkdir -p ${ASSETS}
+ 
+-adb pull /sdcard/Android/data/org.mlperf.inference/files/mlperf/results.json ${ASSETS}/results.json
+-adb pull /sdcard/Android/data/org.mlperf.inference/files/log_performance ${ASSETS}/log_performance
+-adb pull /sdcard/Android/data/org.mlperf.inference/files/log_accuracy ${ASSETS}/log_accuracy
++adb pull /sdcard/mlperf_results/results.json ${ASSETS}/results.json
++adb pull /sdcard/mlperf_results/log_performance ${ASSETS}/log_performance
++adb pull /sdcard/mlperf_results/log_accuracy ${ASSETS}/log_accuracy
+ 
+diff --git a/mobile_back_qti/variables.bzl b/mobile_back_qti/variables.bzl
+index b4ecc2a..a4df508 100644
+--- a/mobile_back_qti/variables.bzl
++++ b/mobile_back_qti/variables.bzl
+@@ -1 +1 @@
+-SNPE_VERSION = "snpe-1.48.0.2554"
++SNPE_VERSION = "snpe-1.54.2.2899"

@@ -1,0 +1,17 @@
+# Build mlperf_app.apk with QTI backend support
+git clone https://github.com/mlcommons/mobile_app_open
+cd mobile_app_open
+git checkout ef08df763b06d0ab03ce45488ed7da29a6d94ea2
+patch -p1 < ../qti_submission.patch
+make WITH_QTI=1 app
+
+# Push app to device
+adb install output/mlperf_app.apk
+
+# Push the models to the device
+adb push ../mlperf_models /sdcard/mlperf_models
+
+# Push the datatsets to the device
+adb push mlperf_datasets /sdcard/mlperf_datatsets
+
+# Now you can launch the app, select submission mode and press GO

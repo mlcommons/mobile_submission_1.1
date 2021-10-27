@@ -1,0 +1,29 @@
+models:
+  - name:  ssd_mobiledet_coco2017
+    launchers:
+      - framework: dlsdk
+        tags:
+          - FP16
+        model:   IR/ssd-mobiledet.xml
+        weights: IR/ssd-mobiledet.bin
+        adapter: ssd
+
+    datasets:
+      - name: ms_coco_detection_91_classes
+        annotation_conversion:
+          converter: mscoco_detection
+          annotation_file: annotations/calibration_instances_train2017.json
+          has_background: True
+          sort_annotations: True
+          use_full_label_map: True
+        annotation: annotations/mscoco_det_91.pickle
+        dataset_meta: annotations/mscoco_det_91.json
+        data_source: </path/to/mscoco-train2017-dataset>
+   
+        preprocessing:
+          - type: resize
+            size: 320
+        postprocessing:
+          - type: resize_prediction_boxes
+        metrics:
+          - type: coco_precision

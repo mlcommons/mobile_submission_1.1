@@ -1,0 +1,19 @@
+{
+        "System": "Honor 50",
+        "Processor Name": "Qualcomm Snapdragon 778G",
+        
+        "CPU_Type_1": "4x Qualcomm Kryo 670 Gold Cores: 2.4 Ghz",
+        "CPU_Type_2": "4x Qualcomm Kryo 670 Silver Cores: 1.80 Ghz",
+        
+        "Graphics": "Qualcomm Adreno 642L",
+
+        "Accelerator_type_1": "Qualcomm Hexagon 770 Processor: Hexagon Vector eXtensions (HVX)",
+        "Accelerator_type_2": "Qualcomm Hexagon 770 Processor: Hexagon Tensor Processor (HTP)",
+        
+        "DRAM": "2xLPDDr5 8GB",
+        
+        "OS Version": "Android 11, Magic UI 4.2, Build Number 4.2.0.157",
+        "TFlite Version": "2.6.0",
+        "TFLite delegate types": "none",
+        "vendor SDK": "Qualcomm Neural Processing SDK v1.54.2"
+}

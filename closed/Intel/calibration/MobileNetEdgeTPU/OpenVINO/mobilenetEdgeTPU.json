@@ -1,0 +1,23 @@
+{
+    "model": {
+        "model_name": "mobilenet-edge_int8",
+        "model": "IR/mobilenet-edge.xml",
+        "weights": "IR/mobilenet-edge.bin"
+    },
+    "engine": {
+		"config": "mobilenetEdgeTPU.yml"
+	},
+		
+    "compression": {
+        "target_device": "GPU",
+        "algorithms": [
+            {
+                "name": "DefaultQuantization",
+                "params": {
+                    "stat_subset_size": 500,
+                    "preset": "performance"
+                }
+            }
+        ]
+    }
+}

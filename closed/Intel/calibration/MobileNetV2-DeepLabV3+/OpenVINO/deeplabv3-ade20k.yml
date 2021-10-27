@@ -1,0 +1,42 @@
+models:
+  - name: deeplabv3
+    launchers:
+      - framework: dlsdk
+        tags:
+          - FP16
+        model:   FP16/deeplabv3_fp16.xml
+        weights: FP16/deeplabv3_fp16.bin
+        adapter: segmentation
+
+    datasets:
+      - name: ade20k
+        data_source: </path/to/ADEChallengeData2016>/images/calibration
+        segmentation_masks_source: </path/to/ADEChallengeData2016>/annotations/calibration
+        annotation_conversion:
+          converter: ade20k
+          images_dir: </path/to/ADEChallengeData2016>/images/calibration
+          annotations_dir: </path/to/ADEChallengeData2016>/annotations/calibration
+          object_categories_file: </path/to/ADEChallengeData2016>/objectInfo150.txt
+          num_classes: 32
+        reader: opencv_imread
+        preprocessing:
+          - type: bgr_to_rgb
+          - type: resize
+            aspect_ratio_scale: min_ratio
+            size: 512
+          - type: crop_or_pad
+            size: 512
+        postprocessing:
+          - type: resize_segmentation_mask
+            to_dst_image_size: true
+            apply_to: annotation
+          - type: crop_or_pad
+            size: 512
+        metrics:
+          - type: mean_iou
+            use_argmax: false
+            presenter: print_scalar
+            ignore_label: 0
+          - type: segmentation_accuracy
+            use_argmax: false
+            ignore_label: 0

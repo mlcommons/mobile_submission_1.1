@@ -1,0 +1,7 @@
+{
+        "input_data_types": "UINT8",
+        "retraining": "none",
+        "starting_weights_filename": "https://github.com/mlcommons/mobile/blob/master/vision/deeplab/models_and_code/checkpoints/quantize_aware_training/freeze.pb",
+        "weight_data_types": "We transform the fp32 weights to int8",
+        "weight_transformations": "none"
+}
