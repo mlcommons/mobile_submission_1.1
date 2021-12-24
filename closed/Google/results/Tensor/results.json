@@ -1,0 +1,142 @@
+[
+    {
+        "benchmark_id": "IC_tpu_uint8",
+        "configuration": {
+            "runtime": ""
+        },
+        "score": "964.6727",
+        "accuracy": "N\/A",
+        "min_duration": "60000.0",
+        "duration": "59815.914",
+        "min_samples": "1024",
+        "num_samples": "62764",
+        "mode": "performance_lite_mode",
+        "datetime": "2021-11-25T11:33:07.232"
+    },
+    {
+        "benchmark_id": "OD_uint8",
+        "configuration": {
+            "runtime": ""
+        },
+        "score": "460.2246",
+        "accuracy": "N\/A",
+        "min_duration": "60000.0",
+        "duration": "59939.773",
+        "min_samples": "1024",
+        "num_samples": "28169",
+        "mode": "performance_lite_mode",
+        "datetime": "2021-11-25T11:33:07.233"
+    },
+    {
+        "benchmark_id": "IS_uint8",
+        "configuration": {
+            "runtime": ""
+        },
+        "score": "216.59927",
+        "accuracy": "N\/A",
+        "min_duration": "60000.0",
+        "duration": "59963.684",
+        "min_samples": "1024",
+        "num_samples": "13395",
+        "mode": "performance_lite_mode",
+        "datetime": "2021-11-25T11:33:07.233"
+    },
+    {
+        "benchmark_id": "LU_float32",
+        "configuration": {
+            "runtime": ""
+        },
+        "score": "70.21233",
+        "accuracy": "N\/A",
+        "min_duration": "60000.0",
+        "duration": "59999.473",
+        "min_samples": "1024",
+        "num_samples": "4341",
+        "mode": "performance_lite_mode",
+        "datetime": "2021-11-25T11:33:07.233"
+    },
+    {
+        "benchmark_id": "IC_tpu_uint8_offline",
+        "configuration": {
+            "runtime": ""
+        },
+        "score": "1906.079",
+        "accuracy": "N\/A",
+        "min_duration": "0.0",
+        "duration": "12893.484",
+        "min_samples": "24576",
+        "num_samples": "24576",
+        "mode": "performance_lite_mode",
+        "datetime": "2021-11-25T11:33:07.234"
+    },
+    {
+        "benchmark_id": "IC_tpu_uint8",
+        "configuration": {
+            "runtime": ""
+        },
+        "score": "Infinity",
+        "accuracy": "75.88%",
+        "min_duration": "60000.0",
+        "duration": "0.0",
+        "min_samples": "1024",
+        "num_samples": "0",
+        "mode": "accuracy_mode",
+        "datetime": "2021-11-25T11:33:07.234"
+    },
+    {
+        "benchmark_id": "OD_uint8",
+        "configuration": {
+            "runtime": ""
+        },
+        "score": "Infinity",
+        "accuracy": "0.2718 mAP",
+        "min_duration": "60000.0",
+        "duration": "0.0",
+        "min_samples": "1024",
+        "num_samples": "0",
+        "mode": "accuracy_mode",
+        "datetime": "2021-11-25T11:33:07.234"
+    },
+    {
+        "benchmark_id": "IS_uint8",
+        "configuration": {
+            "runtime": ""
+        },
+        "score": "Infinity",
+        "accuracy": "0.5406 mIoU",
+        "min_duration": "60000.0",
+        "duration": "0.0",
+        "min_samples": "1024",
+        "num_samples": "0",
+        "mode": "accuracy_mode",
+        "datetime": "2021-11-25T11:33:07.235"
+    },
+    {
+        "benchmark_id": "LU_float32",
+        "configuration": {
+            "runtime": ""
+        },
+        "score": "Infinity",
+        "accuracy": "94.0000",
+        "min_duration": "60000.0",
+        "duration": "0.0",
+        "min_samples": "1024",
+        "num_samples": "0",
+        "mode": "accuracy_mode",
+        "datetime": "2021-11-25T11:33:07.235"
+    },
+    {
+        "benchmark_id": "IC_tpu_uint8_offline",
+        "configuration": {
+            "runtime": ""
+        },
+        "score": "0.0",
+        "accuracy": "75.88%",
+        "min_duration": "0.0",
+        "duration": "0.0",
+        "min_samples": "24576",
+        "num_samples": "0",
+        "mode": "accuracy_mode",
+        "datetime": "2021-11-25T11:33:07.235"
+    }
+]
